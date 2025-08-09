@@ -1,8 +1,8 @@
-name: Keep Proxy Alive
+name: Keep Proxy Alive ( CACHE YOK )
 
 on:
-  schedule:
-    - cron: "30 */4 * * *"    
+#  schedule:
+#    - cron: "30 */4 * * *"    
 
   workflow_dispatch:
 
