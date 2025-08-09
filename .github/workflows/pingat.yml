@@ -34,10 +34,14 @@ jobs:
 
           echo "✅ 5 saatlik çalışma tamamlandı."
 
-          # En son sadece 1 kere PING_CACHE_URL'e ping at
           echo "🔄 Cache ping atılıyor: $(date '+%Y-%m-%d %H:%M:%S')"
           CACHE_HTML=$(curl -s "$PING_CACHE_URL")
-          CACHE_TEXT=$(echo "$CACHE_HTML" | grep -oP '(?<=<h1>).*?(?=</h1>)')
+
+          CACHE_TEXT=$(echo "$CACHE_HTML" | grep -Po '(?<="message": ")[^"]+')
+
+          if [[ -z "$CACHE_TEXT" ]]; then
+            CACHE_TEXT=$(echo "$CACHE_HTML" | sed -n 's/.*"message": *"\([^"]*\)".*/\1/p')
+          fi
 
           if [[ -z "$CACHE_TEXT" ]]; then
             echo "❌ Cache sistemi pasif olabilir!"
