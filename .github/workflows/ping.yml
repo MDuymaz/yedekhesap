@@ -1,5 +1,5 @@
-name: Keep Proxy Alive
-
+name: Keep Proxy Alive 2 URL
+ 
 on:
   schedule:
     - cron: "30 */4 * * *"
