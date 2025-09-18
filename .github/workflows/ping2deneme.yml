@@ -1,0 +1,63 @@
+name: Keep Proxy Alive 2 URL DENEME
+on:
+  schedule:
+    - cron: "30 */4 * * *"
+  workflow_dispatch:
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 5 saat boyunca her 10 dakikada bir ping at ve en sonunda cache ping at
+        env:
+          PING_URL: ${{ secrets.PING_URL }}
+          PING_URL2: ${{ secrets.PING_URL2 }}
+          PING_CACHE_URL: ${{ secrets.PING_CACHE_URL }}
+          PING_CACHE_URL2: ${{ secrets.PING_CACHE_URL2 }}
+        run: |
+          # jq yüklü değilse yükle
+          if ! command -v jq &> /dev/null; then
+            echo "jq bulunamadı, yükleniyor..."
+            sudo apt-get update && sudo apt-get install -y jq
+          fi
+
+          END_TIME=$((SECONDS + 5 * 60 * 60))
+
+          while [ $SECONDS -lt $END_TIME ]; do
+            # Normal URL ping
+            for URL_NAME in PING_URL PING_URL2; do
+              URL=${!URL_NAME}
+              echo "🔄 $URL_NAME için ping atılıyor: $URL - $(date '+%Y-%m-%d %H:%M:%S')"
+              
+              HTML=$(curl -s "$URL")
+              TEXT=$(echo "$HTML" | grep -oP '(?<=<h1>).*?(?=</h1>)')
+
+              if [[ -z "$TEXT" ]]; then
+                echo "❌ $URL_NAME sistemi pasif olabilir!"
+              else
+                echo "✅ $URL_NAME: $TEXT"
+              fi
+            done
+
+            echo "⏳ 10 dakika bekleniyor..."
+            sleep 600
+          done
+
+          echo "✅ 5 saatlik çalışma tamamlandı."
+
+          # Cache URL ping (JSON-safe)
+          for CACHE_NAME in PING_CACHE_URL PING_CACHE_URL2; do
+            CACHE_URL=${!CACHE_NAME}
+            echo "🔄 $CACHE_NAME cache ping atılıyor: $CACHE_URL - $(date '+%Y-%m-%d %H:%M:%S')"
+            
+            CACHE_HTML=$(curl -s "$CACHE_URL")
+
+            # JSON parsing için jq kullan
+            CACHE_TEXT=$(echo "$CACHE_HTML" | jq -r '.message')
+
+            if [[ -z "$CACHE_TEXT" || "$CACHE_TEXT" == "null" ]]; then
+              echo "❌ $CACHE_NAME cache sistemi pasif olabilir!"
+            else
+              echo "✅ $CACHE_NAME cache: $CACHE_TEXT"
+            fi
+          done
