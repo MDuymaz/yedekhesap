@@ -12,8 +12,10 @@ jobs:
         env:
           PING_URL: ${{ secrets.PING_URL }}
           PING_URL2: ${{ secrets.PING_URL2 }}
+          PING_URL3: ${{ secrets.PING_URL3 }}
           PING_CACHE_URL: ${{ secrets.PING_CACHE_URL }}
           PING_CACHE_URL2: ${{ secrets.PING_CACHE_URL2 }}
+          PING_CACHE_URL3: ${{ secrets.PING_CACHE_URL3 }}
         run: |
           # jq yüklü değilse yükle
           if ! command -v jq &> /dev/null; then
@@ -25,7 +27,7 @@ jobs:
 
           while [ $SECONDS -lt $END_TIME ]; do
             # Normal URL ping
-            for URL_NAME in PING_URL PING_URL2; do
+            for URL_NAME in PING_URL PING_URL2 PING_URL3; do
               URL=${!URL_NAME}
               echo "🔄 $URL_NAME için ping atılıyor: $URL - $(date '+%Y-%m-%d %H:%M:%S')"
               
@@ -46,7 +48,7 @@ jobs:
           echo "✅ 5 saatlik çalışma tamamlandı."
 
           # Cache URL ping (JSON-safe)
-          for CACHE_NAME in PING_CACHE_URL PING_CACHE_URL2; do
+          for CACHE_NAME in PING_CACHE_URL PING_CACHE_URL2 PING_CACHE_URL3; do
             CACHE_URL=${!CACHE_NAME}
             echo "🔄 $CACHE_NAME cache ping atılıyor: $CACHE_URL - $(date '+%Y-%m-%d %H:%M:%S')"
             
