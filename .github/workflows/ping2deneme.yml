@@ -1,7 +1,7 @@
 name: Keep Proxy Alive 2 URL DENEME
 on:
   schedule:
-    - cron: "30 */4 * * *"
+    - cron: "* */4 * * *"
   workflow_dispatch:
 
 jobs:
