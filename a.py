@@ -5,6 +5,18 @@ from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 
+# --- Hata toleranslı decompress fonksiyonu ---
+def decompress_content(response):
+    try:
+        if response.headers.get("content-encoding") == "zstd":
+            dctx = zstd.ZstdDecompressor()
+            with dctx.stream_reader(io.BytesIO(response.content)) as reader:
+                return reader.read()
+        else:
+            return response.content
+    except zstd.ZstdError:
+        return response.content
+
 # --- 1. Stream listesi al ---
 url_list = "https://api.istplay.xyz/stream-list-v2/?tv=tv"
 headers = {
@@ -18,17 +30,8 @@ headers = {
                   "Chrome/141.0.0.0 Safari/537.36",
 }
 
-response = requests.get(url_list, headers=headers)
-
-# --- 2. Zstandard sıkıştırmasını çöz ---
-if response.headers.get("content-encoding") == "zstd":
-    dctx = zstd.ZstdDecompressor()
-    with dctx.stream_reader(io.BytesIO(response.content)) as reader:
-        data = reader.read()
-else:
-    data = response.content
-
-# --- 3. JSON parse ---
+response = requests.get(url_list, headers=headers, timeout=15)
+data = decompress_content(response)
 parsed = json.loads(data)
 
 # --- 4. m3u8 linkini alma fonksiyonu ---
@@ -36,14 +39,7 @@ def get_m3u8(stream_id):
     try:
         url = f"https://istplay.xyz/tv/?stream_id={stream_id}"
         response = requests.get(url, headers=headers, timeout=10)
-
-        if response.headers.get("content-encoding") == "zstd":
-            dctx = zstd.ZstdDecompressor()
-            with dctx.stream_reader(io.BytesIO(response.content)) as reader:
-                data = reader.read()
-        else:
-            data = response.content
-
+        data = decompress_content(response)
         html_text = data.decode("utf-8", errors="replace")
         soup = BeautifulSoup(html_text, "html.parser")
         source = soup.find("source", {"type": "application/x-mpegURL"})
@@ -58,15 +54,8 @@ all_events = []
 for sport_name, sport_category in parsed.get("sports", {}).items():
     if not isinstance(sport_category, dict):
         continue
-
     events = sport_category.get("events", {})
-    if isinstance(events, dict):
-        iterable = events.items()
-    elif isinstance(events, list):
-        iterable = [(str(i), e) for i, e in enumerate(events)]
-    else:
-        continue
-
+    iterable = events.items() if isinstance(events, dict) else [(str(i), e) for i, e in enumerate(events)]
     for event_id, event_data in iterable:
         stream_id = event_data.get("stream_id")
         if stream_id:
@@ -103,18 +92,12 @@ sport_translation = {
 }
 
 # --- 8. M3U formatlı çıktı üret ---
-output_lines = ['#EXTM3U', '']  # #EXTM3U'nin altına tek boş satır
+output_lines = ['#EXTM3U', '']
 group_title = "DÜNYA SPORLARI"
 
 for sport_name, sport_category in parsed.get("sports", {}).items():
     events = sport_category.get("events", {})
-    if isinstance(events, dict):
-        iterable = events.items()
-    elif isinstance(events, list):
-        iterable = [(str(i), e) for i, e in enumerate(events)]
-    else:
-        continue
-
+    iterable = events.items() if isinstance(events, dict) else [(str(i), e) for i, e in enumerate(events)]
     for event_id, event_data in iterable:
         league = event_data.get("league", "Bilinmiyor")
         competitors = event_data.get("competitiors", {})
@@ -122,18 +105,15 @@ for sport_name, sport_category in parsed.get("sports", {}).items():
         away = competitors.get("away", "").strip()
         m3u8_url = event_data.get("m3u8_url", "Link yok")
 
-        # Spor adı ve logo
         sport_info = sport_translation.get(sport_name.upper(), {"name": sport_name.upper(), "logo": ""})
         display_sport = sport_info["name"]
         logo_url = sport_info.get("logo", "")
 
-        # HORSE_RACING özel durumu: vs yok
         if sport_name.upper() == "HORSE_RACING":
             display_title = f"{home.upper()} ({league.upper()})"
         else:
             display_title = f"{home.upper()} vs {away.upper()} ({league.upper()})"
 
-        # M3U format satırları
         line = f'#EXTINF:-1 tvg-name="{display_sport}" tvg-logo="{logo_url}" group-title="{group_title}",{display_title}\n{m3u8_url}'
         output_lines.append(line)
 
