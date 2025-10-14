@@ -1,0 +1,45 @@
+name: Run Sports M3U Script
+
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: "0 12 * * *"  # Her gün 12:00 UTC'de çalıştır
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Repo'yu checkout et
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # 2. Python kur
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      # 3. Gerekli paketleri yükle
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests beautifulsoup4 zstandard
+
+      # 4. Scripti çalıştır
+      - name: Run script
+        run: python a.py
+
+      # 5. Değişiklikleri git ile commit ve push et
+      - name: Commit and Push M3U
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add all_world_sports.m3u
+          git commit -m "Update M3U playlist [skip ci]" || echo "No changes to commit"
+          git push
+        env:
+          # Eğer private repo ise GITHUB_TOKEN gerekli
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
