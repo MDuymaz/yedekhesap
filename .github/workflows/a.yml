@@ -1,11 +1,7 @@
 name: Run Sports M3U Script
 
 on:
-  push:
-    branches:
-      - main
-  schedule:
-    - cron: "0 12 * * *"  # Her gün 12:00 UTC'de çalıştır
+  workflow_dispatch:
 
 jobs:
   build-and-push:
