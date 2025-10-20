@@ -27,6 +27,8 @@ jobs:
           python - <<'EOF'
           import requests
           import os
+          import sys
+          import time
 
           token = os.environ['GITHUB_TOKEN']
           owner = os.environ['REPO_OWNER']
@@ -44,7 +46,7 @@ jobs:
                   url = f'https://api.github.com/repos/{owner}/{repo}/actions/runs?page={page}&per_page=100'
                   r = requests.get(url, headers=headers)
                   if r.status_code != 200:
-                      print(f"Hata: {r.status_code} — {r.text}")
+                      print(f"Hata: {r.status_code} — {r.text}", flush=True)
                       break
                   data = r.json()
                   if not data.get('workflow_runs'):
@@ -55,19 +57,21 @@ jobs:
 
           def delete_run(run):
               run_id = run['id']
-              name = run['name']
-              status = run['status']
-              created = run['created_at']
+              name = run.get('name', 'Bilinmiyor')
+              status = run.get('status', 'N/A')
+              created = run.get('created_at', 'N/A')
               url = f'https://api.github.com/repos/{owner}/{repo}/actions/runs/{run_id}'
               r = requests.delete(url, headers=headers)
               if r.status_code == 204:
-                  print(f"✅ Silindi: {name} | Durum: {status} | Tarih: {created} | ID: {run_id}")
+                  print(f"✅ Silindi: {name} | Durum: {status} | Tarih: {created} | ID: {run_id}", flush=True)
               else:
-                  print(f"❌ Silinemedi: {name} ({run_id}) — {r.status_code} — {r.text}")
+                  print(f"❌ Silinemedi: {name} ({run_id}) — {r.status_code} — {r.text}", flush=True)
 
           runs = get_runs()
-          print(f"{len(runs)} adet run bulundu.\n")
+          print(f"{len(runs)} adet run bulundu.", flush=True)
+          print("=" * 60, flush=True)
 
           for run in runs:
               delete_run(run)
+              time.sleep(0.2)  # GitHub API'ye aşırı yüklenmemek için hafif gecikme
           EOF
