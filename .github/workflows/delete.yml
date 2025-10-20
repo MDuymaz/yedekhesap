@@ -3,7 +3,7 @@ name: Delete Old Workflow Runs
 on:
   schedule:
     - cron: "0 0 * * *"  # Her gün gece 00:00'da çalışır (24 saatte bir)
-  workflow_dispatch:       # Manuel tetikleme de mümkün
+  workflow_dispatch:
 
 jobs:
   cleanup:
@@ -53,16 +53,21 @@ jobs:
                   page += 1
               return runs
 
-          def delete_run(run_id):
+          def delete_run(run):
+              run_id = run['id']
+              name = run['name']
+              status = run['status']
+              created = run['created_at']
               url = f'https://api.github.com/repos/{owner}/{repo}/actions/runs/{run_id}'
               r = requests.delete(url, headers=headers)
               if r.status_code == 204:
-                  print(f"✅ Silindi: {run_id}")
+                  print(f"✅ Silindi: {name} | Durum: {status} | Tarih: {created} | ID: {run_id}")
               else:
-                  print(f"❌ Silinemedi: {run_id} — {r.status_code} — {r.text}")
+                  print(f"❌ Silinemedi: {name} ({run_id}) — {r.status_code} — {r.text}")
 
           runs = get_runs()
-          print(f"{len(runs)} adet run bulundu.")
+          print(f"{len(runs)} adet run bulundu.\n")
+
           for run in runs:
-              delete_run(run['id'])
+              delete_run(run)
           EOF
