@@ -21,13 +21,18 @@ def scroll_and_collect_series(url):
         os.makedirs(OUTPUT_DIR)
 
     with sync_playwright() as p:
-        browser = p.firefox.launch(headless=True)
+        # Headless=False, Cloudflare challenge geçmesi için
+        browser = p.firefox.launch(headless=False)
         page = browser.new_page()
         page.goto(url, timeout=60000)
 
-        # Gelen HTML'i yazdır
-        html_content = page.content()
-        print("📄 Gelen HTML:", html_content, flush=True)
+        # Cloudflare'in JS challenge sayfasını geçmek için bekle
+        try:
+            page.wait_for_selector("article.movie-type-genres li", timeout=20000)
+        except:
+            print("⚠️ Sayfa yüklenemedi veya Cloudflare engeli devam ediyor.")
+            browser.close()
+            return
 
         series_dict = {}
         last_count = 0
@@ -42,7 +47,7 @@ def scroll_and_collect_series(url):
                 img_el = li.query_selector("img[src]")
 
                 if link_el and title_el and img_el:
-                    link = link_el.get_attribute("href")  # sadece /dizi/... kısmı
+                    link = link_el.get_attribute("href")
                     title = title_el.inner_text().strip()
                     img = img_el.get_attribute("src")
 
@@ -53,11 +58,10 @@ def scroll_and_collect_series(url):
                         }
                         print(f"🎬 {title.upper()} bulundu.", flush=True)
 
-            # Kaydır
+            # Kaydır ve insan benzeri bekleme
             page.mouse.wheel(0, 4000)
-            time.sleep(2)
+            time.sleep(3)  # biraz daha uzun bekleyelim
 
-            # Yeni eleman yoksa 3 tur bekle ve çık
             if len(series_dict) == last_count:
                 stable_rounds += 1
             else:
@@ -68,7 +72,6 @@ def scroll_and_collect_series(url):
 
             last_count = len(series_dict)
 
-        # JSON dosyasına kaydet
         with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
             json.dump(series_dict, f, ensure_ascii=False, indent=2)
 
