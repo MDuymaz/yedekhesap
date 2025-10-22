@@ -21,14 +21,17 @@ def scroll_and_collect_series(url):
         os.makedirs(OUTPUT_DIR)
 
     with sync_playwright() as p:
-        # Headless=False, Cloudflare challenge geçmesi için
-        browser = p.firefox.launch(headless=False)
-        page = browser.new_page()
+        browser = p.firefox.launch(headless=True)  # Headless mod
+        context = browser.new_context(
+            viewport={"width": 1280, "height": 800},
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        )
+        page = context.new_page()
         page.goto(url, timeout=60000)
 
-        # Cloudflare'in JS challenge sayfasını geçmek için bekle
+        # Cloudflare JS challenge geçme simülasyonu
         try:
-            page.wait_for_selector("article.movie-type-genres li", timeout=20000)
+            page.wait_for_selector("article.movie-type-genres li", timeout=30000)
         except:
             print("⚠️ Sayfa yüklenemedi veya Cloudflare engeli devam ediyor.")
             browser.close()
@@ -58,9 +61,9 @@ def scroll_and_collect_series(url):
                         }
                         print(f"🎬 {title.upper()} bulundu.", flush=True)
 
-            # Kaydır ve insan benzeri bekleme
+            # Kaydır ve biraz bekle
             page.mouse.wheel(0, 4000)
-            time.sleep(3)  # biraz daha uzun bekleyelim
+            time.sleep(2 + 1 * (len(series_dict) % 3))  # randomize et gibi
 
             if len(series_dict) == last_count:
                 stable_rounds += 1
