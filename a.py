@@ -1,85 +1,95 @@
-from playwright.sync_api import sync_playwright
-import requests
+import cloudscraper
 import time
+from bs4 import BeautifulSoup
 import json
-import os
+import re
 
+# Github üzerinden domain alma
 DOMAIN_URL = "https://raw.githubusercontent.com/zerodayip/domain/refs/heads/main/dizipal.txt"
-response = requests.get(DOMAIN_URL)
+scraper = cloudscraper.create_scraper()
+
+response = scraper.get(DOMAIN_URL)
 if response.status_code != 200:
     raise Exception(f"Domain alınamadı! Hata: {response.status_code}")
-
 BASE_URL = response.text.strip()
 print(f"🌍 Kullanılan BASE_URL: {BASE_URL}", flush=True)
 
-LIST_URL = f"{BASE_URL}/diziler?kelime=&durum=&tur=24&type=&siralama="
-OUTPUT_DIR = "dizipal"
-OUTPUT_FILE = os.path.join(OUTPUT_DIR, "diziler.json")
+# Ana sayfa için 30 saniye bekle
+print("⏳ Ana sayfa yükleniyor, 30 saniye bekleniyor...", flush=True)
+time.sleep(30)
 
-def scroll_and_collect_series(url):
-    if not os.path.exists(OUTPUT_DIR):
-        os.makedirs(OUTPUT_DIR)
+# JSON dosyasından dizileri oku
+JSON_FILE = "dizipal/diziler.json"
+with open(JSON_FILE, "r", encoding="utf-8") as f:
+    series_data = json.load(f)
 
-    with sync_playwright() as p:
-        browser = p.firefox.launch(headless=True)  # Headless mod
-        context = browser.new_context(
-            viewport={"width": 1280, "height": 800},
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        )
-        page = context.new_page()
-        page.goto(url, timeout=60000)
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                  "AppleWebKit/537.36 (KHTML, like Gecko) "
+                  "Chrome/121.0.0.0 Safari/537.36",
+    "Referer": BASE_URL
+}
 
-        # Cloudflare JS challenge geçme simülasyonu
-        try:
-            page.wait_for_selector("article.movie-type-genres li", timeout=30000)
-        except:
-            print("⚠️ Sayfa yüklenemedi veya Cloudflare engeli devam ediyor.")
-            browser.close()
-            return
+OUTPUT_FILE = "dizipalyerlidizi.m3u"
 
-        series_dict = {}
-        last_count = 0
-        stable_rounds = 0
+def scrape_series_episodes(series_href):
+    url = f"{BASE_URL}{series_href}"
+    resp = scraper.get(url, headers=HEADERS, timeout=15)
+    resp.raise_for_status()
 
-        while True:
-            lis = page.query_selector_all("article.movie-type-genres li")
+    soup = BeautifulSoup(resp.text, "html.parser")
 
-            for li in lis:
-                link_el = li.query_selector("a[data-date]")
-                title_el = li.query_selector(".title")
-                img_el = li.query_selector("img[src]")
+    # IMDb puanını al
+    imdb_div = soup.find("div", class_="key", string="IMDB Puanı")
+    if imdb_div:
+        value_div = imdb_div.find_next_sibling("div", class_="value")
+        imdb_score = value_div.get_text(strip=True) if value_div else "-"
+    else:
+        imdb_score = "-"
 
-                if link_el and title_el and img_el:
-                    link = link_el.get_attribute("href")
-                    title = title_el.inner_text().strip()
-                    img = img_el.get_attribute("src")
+    # Bölümleri al
+    episodes = []
+    for ep_div in soup.select("div.episode-item a[href]"):
+        ep_href = ep_div.get("href")
+        ep_title_div = ep_div.select_one("div.episode")
+        ep_title = ep_title_div.get_text(strip=True) if ep_title_div else "-"
+        episodes.append({"href": ep_href, "title": ep_title})
 
-                    if link not in series_dict:
-                        series_dict[link] = {
-                            "group": title,
-                            "tvg-logo": img
-                        }
-                        print(f"🎬 {title.upper()} bulundu.", flush=True)
+    return {"imdb": imdb_score, "episodes": episodes}
 
-            # Kaydır ve biraz bekle
-            page.mouse.wheel(0, 4000)
-            time.sleep(2 + 1 * (len(series_dict) % 3))  # randomize et gibi
+def main():
+    with open(OUTPUT_FILE, "w", encoding="utf-8") as m3u_file:
+        print("#EXTM3U", flush=True, file=m3u_file)
 
-            if len(series_dict) == last_count:
-                stable_rounds += 1
-            else:
-                stable_rounds = 0
+        for series_href, info in series_data.items():
+            print(f"🎬 {info['group']} bölümleri çekiliyor.", flush=True)
 
-            if stable_rounds >= 3:
-                break
+            try:
+                data = scrape_series_episodes(series_href)
+                imdb_score = data["imdb"]
+                tvg_logo = info["tvg-logo"]
+                group = info["group"]
 
-            last_count = len(series_dict)
+                for ep in data["episodes"]:
+                    ep_href = ep["href"]
+                    ep_title_full = ep["title"].upper()
 
-        with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-            json.dump(series_dict, f, ensure_ascii=False, indent=2)
+                    season_match = re.search(r"(\d+)\.\s*SEZON", ep_title_full)
+                    episode_match = re.search(r"(\d+)\.\s*BÖLÜM", ep_title_full)
+                    season = season_match.group(1).zfill(2) if season_match else "01"
+                    episode = episode_match.group(1).zfill(2) if episode_match else "01"
 
-        print(f"\n✅ Toplam {len(series_dict)} dizi bulundu ve '{OUTPUT_FILE}' dosyasına kaydedildi.", flush=True)
-        browser.close()
+                    tvg_name = f"{group.upper()} S{season}E{episode}"
+                    extinf_line = f'#EXTINF:-1 tvg-id="" tvg-name="{tvg_name.upper()}" tvg-logo="{tvg_logo}" group-title="{group.upper()}", {group.upper()} {season}. SEZON {episode} (IMDb: {imdb_score} | YERLİ DİZİ | DIZIPAL)'
+                    proxy_url = f"https://zerodayip.com/proxy/dizipal?url={BASE_URL}{ep_href}"
+
+                    print(extinf_line, file=m3u_file, flush=True)
+                    print(proxy_url, file=m3u_file, flush=True)
+
+            except Exception as e:
+                print(f"⚠️ {group} için hata: {e}", flush=True)
+
+    print(f"\n✅ Dizipal m3u dosyası hazırlandı.", flush=True)
 
 if __name__ == "__main__":
-    scroll_and_collect_series(LIST_URL)
+    main()
