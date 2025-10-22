@@ -1,102 +1,116 @@
-# dizipal_episodes_m3u.py
-# Gereksinim: pip install cloudscraper beautifulsoup4
+# dizipal_episodes_selenium_m3u.py
+# Gereksinimler:
+# pip install selenium webdriver-manager beautifulsoup4
+
 import time
 import json
 import re
-import cloudscraper
 from bs4 import BeautifulSoup
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service as ChromeService
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.by import By
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.common.exceptions import TimeoutException, WebDriverException
 
 # -------------------------
-# Ayarlar / sabitler
+# Ayarlar
 # -------------------------
 DOMAIN_URL = "https://raw.githubusercontent.com/zerodayip/domain/refs/heads/main/dizipal.txt"
 JSON_FILE = "dizipal/diziler.json"
 OUTPUT_FILE = "dizipalyerlidizi.m3u"
 
-# Kaç karakter HTML'i yazdırmak istersin (çok uzunsa terminali doldurabilir)
-HTML_PRINT_LIMIT = 2000
-
-# Her sayfa isteği için en fazla kaç deneme yapılsın
-MAX_RETRIES = 3
-# İstek zaman aşımı (saniye)
-REQUEST_TIMEOUT = 15
-
-# Cloudscraper oluştur
-scraper = cloudscraper.create_scraper()
-
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                  "AppleWebKit/537.36 (KHTML, like Gecko) "
-                  "Chrome/121.0.0.0 Safari/537.36",
-    # Referer dinamik olarak BASE_URL olarak ayarlanacak
-}
+# Tarayıcı ve bekleme ayarları
+INITIAL_PAGE_WAIT = 30       # Ana sayfa için sabit bekleme (isteğin üzerine)
+PAGE_LOAD_MAX_WAIT = 30      # Her sayfa için maksimum bekleme (saniye)
+HTML_PRINT_LIMIT = 2000      # Terminale yazdırılacak HTML uzunluğu (karakter)
+RETRY_COUNT = 1              # Eğer istersen sayfa açmada retry koyabilirsin
 
 # -------------------------
-# Yardımcı fonksiyonlar
+# Selenium başlatma (Chrome)
 # -------------------------
-def fetch_text_with_retries(url, headers=None, timeout=REQUEST_TIMEOUT, max_retries=MAX_RETRIES):
+def make_chrome_driver(headless=True):
+    options = webdriver.ChromeOptions()
+    # Headless kullanmak istersen True bırak, bazı siteler headless'i algılar; gerekirse False yap
+    if headless:
+        options.add_argument("--headless=new")  # chromium 109+ için yeni headless daha stabil
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--disable-extensions")
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_argument("--window-size=1920,1080")
+    # Tarayıcı fingerprint azaltma
+    options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    options.add_experimental_option("useAutomationExtension", False)
+
+    # Servisi oluştur (webdriver-manager ile)
+    service = ChromeService(ChromeDriverManager().install())
+    driver = webdriver.Chrome(service=service, options=options)
+
+    # Navigator.webdriver özelliğini gizleme (CDP injection)
+    try:
+        driver.execute_cdp_cmd(
+            "Page.addScriptToEvaluateOnNewDocument",
+            {
+                "source": """
+                Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+                window.__selenium_forced_navigator_webdriver = undefined;
+                """
+            },
+        )
+    except Exception:
+        pass
+
+    return driver
+
+# -------------------------
+# Sayfa yükleme / bekleme
+# -------------------------
+def load_page_and_wait(driver, url, max_wait=PAGE_LOAD_MAX_WAIT, check_strings=None):
     """
-    Verilen URL'den cloudscraper ile GET yapar. Başarısız olursa birkaç kez tekrar dener.
-    Dönen response.text'i ve status_code'u tuple olarak döndürür.
+    driver.get(url) yapar, sonra max_wait süresince sayfa kaynağını kontrol eder.
+    check_strings: eğer verilen listede bir ifade sayfada bulunuyorsa 'başarılı' sayılır.
+    Eğer check_strings None ise, "Just a moment" başlığı kalkana kadar bekler.
+    Dönen: (page_source, status_ok_bool)
     """
-    attempt = 0
-    wait_seconds = 2
-    last_resp = None
+    driver.get(url)
 
-    while attempt < max_retries:
-        attempt += 1
-        try:
-            resp = scraper.get(url, headers=headers or {}, timeout=timeout)
-            last_resp = resp
-            # Her denemede status code'u kontrol et; 200 gelirse RETURN et
-            if resp.status_code == 200:
-                return resp.text, resp.status_code
-            else:
-                # 403 veya 503 gibi durumlarda challenge sayfası gelebilir, HTML'i incelemek için döndürmeden önce loglayacağız
-                print(f"⚠️ Deneme {attempt}/{max_retries}: HTTP {resp.status_code} döndü for {url}.")
-                # Eğer halen deneme hakkı varsa bekle ve tekrar dene
-                if attempt < max_retries:
-                    time.sleep(wait_seconds)
-                    wait_seconds *= 2
-                else:
-                    return resp.text, resp.status_code
-        except Exception as e:
-            print(f"⚠️ Deneme {attempt}/{max_retries} sırasında istisna oluştu: {e}")
-            if attempt < max_retries:
-                time.sleep(wait_seconds)
-                wait_seconds *= 2
-            else:
-                raise
+    # Windows / env koşullarında ilk render için küçük bekleme
+    start = time.time()
+    while True:
+        page_source = driver.page_source
+        title = driver.title or ""
+        elapsed = time.time() - start
 
-    # Eğer hiç dönemediysek son resp veya None dönebilir
-    if last_resp:
-        return last_resp.text, last_resp.status_code
-    return None, None
+        # 1) Eğer sayfa title "Just a moment" içeriyorsa muhtemelen cloudflare challenge
+        if check_strings:
+            # eğer herhangi bir check_string bulunuyorsa başarılı kabul et
+            for s in check_strings:
+                if s.lower() in page_source.lower():
+                    return page_source, True
+        else:
+            # default kontrol: title "Just a moment" değilse veya "Enable JavaScript" yoksa başarılı
+            if "just a moment" not in title.lower() and "enable javascript" not in page_source.lower():
+                # ayrıca sayfada episode-item gibi beklenen seçici varsa da başarılı
+                if "episode-item" in page_source or re.search(r"IMDB\s*Puan", page_source, re.I):
+                    return page_source, True
+                # eğer challenge yazısı yok ama içerik değişmişse de kabul et
+                if "checking your browser" not in page_source.lower():
+                    return page_source, True
 
-def scrape_series_episodes(series_href, base_url, headers):
-    """
-    Tek bir dizi sayfasını çeker, HTML'i yazdırır ve bölüm listesini + IMDb puanını döndürür.
-    """
-    url = f"{base_url}{series_href}"
-    html_text, status = fetch_text_with_retries(url, headers=headers)
+        if elapsed >= max_wait:
+            return page_source, False
 
-    # Gelen HTML'i her durumda yazdır (kısmî)
-    separator = "-" * 40
-    print(f"\n📄 {url} sayfasının HTML (ilk {HTML_PRINT_LIMIT} karakter):\n{separator}")
-    if html_text is None:
-        print("⚠️ Hiçbir cevap alınamadı (html_text is None).")
-    else:
-        # Güvenlik: terminali aşırı doldurmamak için limitli yazdır
-        print(html_text[:HTML_PRINT_LIMIT])
-    print(f"\n{separator}\nHTTP status: {status}\n")
+        time.sleep(1)
 
-    # Eğer 200 değilse hata fırlat
-    if status != 200:
-        raise Exception(f"Sayfa açılamadı! HTTP {status}")
-
+# -------------------------
+# Scrape fonksiyonu (BeautifulSoup ile pars)
+# -------------------------
+def scrape_series_episodes_from_html(html_text):
     soup = BeautifulSoup(html_text, "html.parser")
 
-    # IMDb puanını al
     imdb_div = soup.find("div", class_="key", string=re.compile(r"IMDB", re.I))
     if imdb_div:
         value_div = imdb_div.find_next_sibling("div", class_="value")
@@ -104,22 +118,19 @@ def scrape_series_episodes(series_href, base_url, headers):
     else:
         imdb_score = "-"
 
-    # Bölümleri al (site yapısına göre seçici)
     episodes = []
-    # Eğer site farklı bir sınıf kullanıyorsa burayı değiştirebilirsin
     for ep_div in soup.select("div.episode-item a[href]"):
         ep_href = ep_div.get("href")
         ep_title_div = ep_div.select_one("div.episode")
         ep_title = ep_title_div.get_text(strip=True) if ep_title_div else "-"
         episodes.append({"href": ep_href, "title": ep_title})
 
-    # Eğer yukarıdaki seçici boş dönerse alternatif olarak bağlantıları gözetleyelim
+    # fallback: linkleri tarayıp 'bolum' gibi anahtar kelimeye göre al
     if not episodes:
         for a in soup.select("a[href]"):
-            # örnek: href içinde '/dizi/' ve 'bolum' gibi pattern'ler aranabilir
             href = a.get("href")
             txt = a.get_text(strip=True) or ""
-            if href and "/bolum" in href.lower() or "bölüm" in txt.lower():
+            if href and ("/bolum" in href.lower() or "bölüm" in txt.lower()):
                 episodes.append({"href": href, "title": txt or href})
 
     return {"imdb": imdb_score, "episodes": episodes}
@@ -128,45 +139,87 @@ def scrape_series_episodes(series_href, base_url, headers):
 # Ana akış
 # -------------------------
 def main():
-    # 1) Github üzerinden domain al
-    print("🌍 Domain bilgisi alınıyor...")
-    domain_text, domain_status = fetch_text_with_retries(DOMAIN_URL, headers=HEADERS)
-    if domain_text is None or domain_status != 200:
-        raise Exception(f"Domain alınamadı! HTTP {domain_status}")
+    # 0) Chrome driver oluştur
+    # Eğer Cloudflare çok sıkıysa headless=False dene (görünür tarayıcı).
+    headless = True  # gerekirse False yap
+    driver = None
+    try:
+        driver = make_chrome_driver(headless=headless)
+    except WebDriverException as e:
+        print("❌ Chrome driver başlatılamadı:", e)
+        print("Chrome yüklü mü? Driver/Chrome sürüm uyuşmazlığı olabilir.")
+        return
 
-    BASE_URL = domain_text.strip()
-    print(f"🌍 Kullanılan BASE_URL: {BASE_URL}")
+    try:
+        # 1) DOMAIN_URL'den BASE_URL al
+        print("🌍 Domain bilgisi alınıyor (tarayıcı ile)...")
+        # Gitmek için direkt requests değil selenium kullanıyoruz (bazı ortamlar için GitHub raw sayfası açılmayabilir; burayı basit bir get olarak da bırakabilirsin)
+        driver.get(DOMAIN_URL)
+        time.sleep(1)
+        domain_page = driver.page_source
+        # raw içeriği body içinde düz metin olarak gelecektir; basit regex ile al
+        m = re.search(r"https?://[^\s'\"<>]+", domain_page)
+        if m:
+            BASE_URL = m.group(0).strip()
+            print(f"🌍 Kullanılan BASE_URL (bulundu): {BASE_URL}")
+        else:
+            # fallback: sayfayı direkt text olarak almayı dene
+            text_only = re.sub(r"<[^>]+>", "", domain_page)
+            BASE_URL = text_only.strip().splitlines()[0].strip()
+            print(f"🌍 Kullanılan BASE_URL (fallback): {BASE_URL}")
 
-    # Referer header'ını BASE_URL olarak güncelle
-    HEADERS["Referer"] = BASE_URL
+        # 2) Ana sayfa için sabit bekleme
+        print(f"⏳ Ana sayfa yükleniyor, {INITIAL_PAGE_WAIT} saniye bekleniyor...", flush=True)
+        time.sleep(INITIAL_PAGE_WAIT)
 
-    # 2) Ana sayfa yüklenmesi için bekleme
-    print("⏳ Ana sayfa yükleniyor, 30 saniye bekleniyor...", flush=True)
-    time.sleep(30)
+        # 3) JSON oku
+        with open(JSON_FILE, "r", encoding="utf-8") as f:
+            series_data = json.load(f)
 
-    # 3) JSON dosyasını oku
-    with open(JSON_FILE, "r", encoding="utf-8") as f:
-        series_data = json.load(f)
+        # 4) M3U dosyası aç
+        with open(OUTPUT_FILE, "w", encoding="utf-8") as m3u_file:
+            print("#EXTM3U", flush=True, file=m3u_file)
 
-    # 4) m3u dosyasını oluştur
-    with open(OUTPUT_FILE, "w", encoding="utf-8") as m3u_file:
-        print("#EXTM3U", flush=True, file=m3u_file)
+            for series_href, info in series_data.items():
+                group = info.get("group", "UNKNOWN")
+                tvg_logo = info.get("tvg-logo", "")
+                print(f"\n🎬 {group} bölümleri çekiliyor.", flush=True)
 
-        for series_href, info in series_data.items():
-            # group değişkenini try dışında tanımlıyoruz (hata sırasında da kullanılabilsin)
-            group = info.get("group", "UNKNOWN")
-            tvg_logo = info.get("tvg-logo", "")
-            print(f"🎬 {group} bölümleri çekiliyor.", flush=True)
+                # tam url
+                target_url = f"{BASE_URL}{series_href}"
 
-            try:
-                data = scrape_series_episodes(series_href, BASE_URL, HEADERS)
+                # sayfayı headless tarayıcı ile aç ve bekle
+                page_html, ok = load_page_and_wait(driver, target_url, max_wait=PAGE_LOAD_MAX_WAIT)
+
+                # Debug: ilk kısmı yazdır
+                print(f"\n📄 {target_url} HTML (ilk {HTML_PRINT_LIMIT} karakter):")
+                if page_html:
+                    print(page_html[:HTML_PRINT_LIMIT])
+                else:
+                    print("⚠️ HTML boş geldi.")
+
+                if not ok:
+                    print(f"⚠️ {group}: Sayfa yüklenemedi veya Cloudflare challenge kaldı (timeout).")
+                    continue
+
+                # Pars et
+                try:
+                    data = scrape_series_episodes_from_html(page_html)
+                except Exception as e:
+                    print(f"⚠️ {group} parsing hatası: {e}")
+                    continue
+
                 imdb_score = data.get("imdb", "-")
+                episodes = data.get("episodes", [])
 
-                for ep in data.get("episodes", []):
+                if not episodes:
+                    print(f"⚠️ {group}: Hiç bölüm bulunamadı.")
+                    continue
+
+                for ep in episodes:
                     ep_href = ep.get("href")
                     ep_title_full = (ep.get("title") or "").upper()
 
-                    # Sezon ve bölüm numarasını ayıkla
                     season_match = re.search(r"(\d+)\.\s*SEZON", ep_title_full)
                     episode_match = re.search(r"(\d+)\.\s*BÖLÜM", ep_title_full)
                     season = season_match.group(1).zfill(2) if season_match else "01"
@@ -179,18 +232,16 @@ def main():
                         f'{group.upper()} {season}. SEZON {episode} (IMDb: {imdb_score} | YERLİ DİZİ | DIZIPAL)'
                     )
 
-                    # proxy url (eski mantığınla aynı)
                     proxy_url = f"https://zerodayip.com/proxy/dizipal?url={BASE_URL}{ep_href}"
 
-                    # Dosyaya yaz
                     print(extinf_line, file=m3u_file, flush=True)
                     print(proxy_url, file=m3u_file, flush=True)
 
-            except Exception as e:
-                # Hata mesajında group kullanımı güvenli (try dışında tanımlı)
-                print(f"⚠️ {group} için hata: {e}", flush=True)
+    finally:
+        if driver:
+            driver.quit()
 
-    print(f"\n✅ Dizipal m3u dosyası hazırlandı: {OUTPUT_FILE}", flush=True)
+    print(f"\n✅ Dizipal m3u dosyası hazırlandı: {OUTPUT_FILE}")
 
 if __name__ == "__main__":
     main()
