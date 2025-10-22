@@ -1,12 +1,9 @@
-# file: dizipal_scraper_json_href_only.py
-
 from playwright.sync_api import sync_playwright
 import requests
 import time
 import json
 import os
 
-# Uzaktaki domain dosyası
 DOMAIN_URL = "https://raw.githubusercontent.com/zerodayip/domain/refs/heads/main/dizipal.txt"
 response = requests.get(DOMAIN_URL)
 if response.status_code != 200:
@@ -27,6 +24,10 @@ def scroll_and_collect_series(url):
         browser = p.firefox.launch(headless=True)
         page = browser.new_page()
         page.goto(url, timeout=60000)
+
+        # Gelen HTML'i yazdır
+        html_content = page.content()
+        print("📄 Gelen HTML:", html_content, flush=True)
 
         series_dict = {}
         last_count = 0
