@@ -1,29 +1,54 @@
 import requests
+from bs4 import BeautifulSoup
+import re
 
-def fetch_full_html(url: str, referer: str = "https://www.google.com/") -> str:
-    headers = {
-        "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                       "AppleWebKit/537.36 (KHTML, like Gecko) "
-                       "Chrome/117.0.0.0 Safari/537.36"),
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
-        "Referer": referer,
-        "Connection": "keep-alive",
-    }
+url = "https://diziyo.to/"
 
-    try:
-        resp = requests.get(url, headers=headers, timeout=10, allow_redirects=True)
-        resp.raise_for_status()
-        if resp.encoding is None or resp.encoding.lower() == 'iso-8859-1':
-            resp.encoding = resp.apparent_encoding
-        return resp.text
-    except requests.exceptions.RequestException as e:
-        raise RuntimeError(f"İstek başarısız: {e}") from e
+headers = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/128.0.0.0 Safari/537.36"
+    ),
+    "Referer": "https://diziyo.to/",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+    "Accept-Language": "tr-TR,tr;q=0.9,en;q=0.8",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Connection": "keep-alive",
+    "Upgrade-Insecure-Requests": "1",
+    "DNT": "1",
+}
 
-if __name__ == "__main__":
-    url = "https://diziyo.to/"
-    try:
-        html = fetch_full_html(url, referer="https://www.google.com/")
-        print(html)  # Tam HTML'i direkt ekrana yazdırır
-    except Exception as err:
-        print("Hata:", err)
+response = requests.get(url, headers=headers)
+
+if response.status_code == 200:
+    soup = BeautifulSoup(response.text, "html.parser")
+    ul = soup.find("ul", id="load-episode-container")
+
+    if ul:
+        items = ul.find_all("li")
+        results = []
+
+        for li in items:
+            a_tag = li.find("a", href=True)
+            title_tag = li.find("h3")
+
+            if a_tag and title_tag:
+                full_link = a_tag["href"]  # örn: /dizi/elsbeth/sezon-3/bolum-2
+                # sadece /dizi/elsbeth kısmını al:
+                match = re.match(r"(/dizi/[^/]+)", full_link)
+                short_link = match.group(1) if match else full_link
+
+                title = title_tag.get_text(strip=True)
+                results.append((title, short_link))
+
+        # Sonuçları yazdır
+        if results:
+            for name, link in results:
+                print(f"{name} --> {link}")
+        else:
+            print("❌ Hiç dizi bulunamadı.")
+    else:
+        print("❌ <ul id='load-episode-container'> bulunamadı.")
+else:
+    print(f"❌ İstek başarısız. Status code: {response.status_code}")
