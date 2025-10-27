@@ -18,7 +18,7 @@ scraper.headers.update({
 })
 
 # --- URL ---
-url = "https://filmhane.online/dizi/kaosun-anatomisi"
+url = "https://filmhane.online/dizi/kaosun-anatomisi/sezon-1/bolum-1"
 
 # --- HTML'i çek ---
 response = scraper.get(url)
