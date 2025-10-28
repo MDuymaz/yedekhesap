@@ -13,7 +13,7 @@ jobs:
           PING_URL: ${{ secrets.PING_URL }}
           PING_URL2: ${{ secrets.PING_URL2 }}
           PING_URL3: ${{ secrets.PING_URL3 }}
-          PING_URL4: ${{ secrets.PING_URL4 }}
+          PING_XTREAM: ${{ secrets.PING_XTREAM }}
           PING_CACHE_URL: ${{ secrets.PING_CACHE_URL }}
           PING_CACHE_URL2: ${{ secrets.PING_CACHE_URL2 }}
           PING_CACHE_URL3: ${{ secrets.PING_CACHE_URL3 }}
@@ -28,7 +28,7 @@ jobs:
 
           while [ $SECONDS -lt $END_TIME ]; do
             # Normal URL ping
-            for URL_NAME in PING_URL PING_URL2 PING_URL3 PING_URL4; do
+            for URL_NAME in PING_URL PING_URL2 PING_URL3 PING_XTREAM; do
               URL=${!URL_NAME}
               echo "🔄 $URL_NAME için ping atılıyor: $URL - $(date '+%Y-%m-%d %H:%M:%S' -u)"
               
