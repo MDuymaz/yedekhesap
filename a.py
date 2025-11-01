@@ -1,4 +1,3 @@
-
 # a_all_channels_with_map_li7.py
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 from datetime import datetime, timedelta
@@ -10,7 +9,7 @@ LI_XPATH_TEMPLATE = "/html/body/div[1]/div/div[1]/div/main/div/div[2]/ul/li[{}]"
 LEFT_BUTTON_XPATH  = "/html/body/div[1]/div/div[1]/div/main/div/div[2]/button[1]"
 RIGHT_BUTTON_XPATH = "/html/body/div[1]/div/div[1]/div/main/div/div[2]/button[2]"
 
-HEADLESS = False
+HEADLESS = True
 DELAY = 0.6
 MAX_SWIPES = 6
 RETRY_PER_TARGET = 2
@@ -219,19 +218,18 @@ def run_channel_epg(page, channel_url):
 # --- Tüm kanallar için --- 
 def run_all_channels_epg():
     programmes_all = []
-    HEADLESS = True
     with sync_playwright() as p:
-        browser = p.chromium.launch(
-            headless=HEADLESS,
-            args=[
-                "--no-sandbox",
-                "--disable-setuid-sandbox",
-                "--disable-dev-shm-usage",
-                "--disable-gpu",
-                "--disable-extensions",
-            ]
-        )
+        browser = p.chromium.launch(headless=HEADLESS, args=["--no-sandbox", "--disable-setuid-sandbox"])
         page = browser.new_page()
+
+        try:
+            page.goto(BASE_URL, wait_until="domcontentloaded", timeout=45000)
+        except PlaywrightTimeoutError:
+            print("Ana sayfa DOM timeout, devam ediliyor.")
+        except Exception as e:
+            print("Ana sayfa açılamadı:", e)
+            browser.close()
+            return
 
         time.sleep(1)
         links = get_channel_links(page)
