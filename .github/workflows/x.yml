@@ -21,7 +21,7 @@ jobs:
       run: |
         curl -X GET "https://sportsobama.com/domain.php" \
         -H "User-Agent: Mozilla/5.0" \
-        -H "Referer: https://example.com" \
+        -H "Referer: https://sportsobama.com" \
         -H "Authorization: Bearer token" # İstediğiniz header'ları buraya ekleyebilirsiniz
 
     - name: Print response
