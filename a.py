@@ -1,30 +1,24 @@
-from playwright.sync_api import sync_playwright
-import re
+from yt_dlp import YoutubeDL
 
 url = "https://www.youtube.com/watch?v=pfQeMtSBv_Y"
 
-with sync_playwright() as p:
-    browser = p.chromium.launch(headless=True)  # headless=False yaparsanız tarayıcıyı görürsünüz
-    context = browser.new_context(
-        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                   "(KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36"
-    )
-    page = context.new_page()
-    page.goto(url)
+ydl_opts = {
+    'quiet': True,
+    'force_generic_extractor': False,
+    'skip_download': True,  # Video indirmeye gerek yok
+    'simulate': True
+}
 
-    # Sayfanın tamamen yüklenmesini bekleyin
-    page.wait_for_timeout(5000)
-
-    # Sayfa kaynağını alın
-    html_content = page.content()
-
-    # .m3u8 linklerini ara
-    m3u8_links = re.findall(r'https?://[^\s"\']+\.m3u8', html_content)
-    if m3u8_links:
-        print("Bulunan m3u8 linkleri:\n")
-        for link in m3u8_links:
-            print(link)
-    else:
-        print("Herhangi bir .m3u8 linki bulunamadı.")
-
-    browser.close()
+with YoutubeDL(ydl_opts) as ydl:
+    info = ydl.extract_info(url, download=False)
+    
+    print("Video Başlığı:", info.get('title'))
+    print("M3U8 / Stream URL'leri:\n")
+    
+    # formatları listele
+    for f in info.get('formats', []):
+        if f.get('protocol') in ['m3u8_native', 'm3u8_dash']:
+            print(f"Format ID: {f['format_id']}")
+            print("URL:", f['url'])
+            print("Resolution:", f.get('height'), "x", f.get('width'))
+            print("-"*40)
