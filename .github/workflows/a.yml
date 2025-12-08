@@ -19,7 +19,15 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install requests beautifulsoup4 playwright cloudscraper yt-dlp
-          playwright install
+          pip install requests beautifulsoup4
+
       - name: Run script
         run: python a.py
+
+      - name: Commit and push a.html
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add a.html
+          git commit -m "Update a.html from workflow" || echo "No changes to commit"
+          git push
