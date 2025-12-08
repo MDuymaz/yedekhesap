@@ -8,8 +8,12 @@ headers = {
     "Referer": url
 }
 
+# Sayfayı çek
 response = requests.get(url, headers=headers)
 html = response.text
 
-# HTML'i terminale yazdır
-print(html)
+# HTML'i a.html dosyasına yaz
+with open("a.html", "w", encoding="utf-8") as f:
+    f.write(html)
+
+print("HTML içeriği a.html dosyasına yazıldı.")
