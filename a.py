@@ -14,25 +14,12 @@ headers = {
 response = requests.get(url, headers=headers)
 html = response.text
 
-# <script> içindeki flashvars_464592005 kısmını regex ile bul
-match = re.search(r'var flashvars_\d+\s*=\s*({.*?});\s*\n', html, re.DOTALL)
-if match:
-    flashvars_str = match.group(1)
-    
-    # JSON formatına uygun hale getirmek için bazı düzeltmeler
-    flashvars_str = flashvars_str.replace('false', 'false').replace('true', 'true').replace('null', 'None')
-    
-    # Python dict'e çevir
-    try:
-        flashvars = eval(flashvars_str)
-        media_defs = flashvars.get('mediaDefinitions', [])
-        
-        print("Bulunan m3u8 linkleri:")
-        for media in media_defs:
-            video_url = media.get('videoUrl', '')
-            if '.m3u8' in video_url:
-                print(video_url)
-    except Exception as e:
-        print("Flashvars parsing hatası:", e)
-else:
-    print("flashvars bulunamadı.")
+# HTML içinde m3u8 linklerini bulmak için regex
+# videoUrl":"https:\/\/...\.m3u8
+m3u8_links = re.findall(r'"videoUrl":"(https:\\/\\/.*?\.m3u8.*?)"', html)
+
+# Bağlantıları terminale yazdır
+for link in m3u8_links:
+    # Escape karakterleri temizle
+    clean_link = link.replace("\\/", "/")
+    print(clean_link)
