@@ -1,33 +1,27 @@
-from yt_dlp import YoutubeDL
+import requests
+from bs4 import BeautifulSoup
 
-# YouTube video URL
-url = "https://www.youtube.com/watch?v=pfQeMtSBv_Y"
+# Hedef URL (buraya güvenli bir site koyabilirsiniz)
+url = "https://nl.pornhub.com/view_video.php?viewkey=67b090c219858"
 
-# yt-dlp ayarları
-ydl_opts = {
-    'quiet': False,                  # Daha fazla çıktı almak için False
-    'skip_download': True,           # Video indirmeye gerek yok
-    'cookies_from_browser': ('chrome',),  # Chrome tarayıcı çerezlerini kullan
-    'force_generic_extractor': False,
+# Headers eklemek (tarayıcı gibi davranmak için)
+headers = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Referer": "https://nl.pornhub.com/"
 }
 
-with YoutubeDL(ydl_opts) as ydl:
-    try:
-        info = ydl.extract_info(url, download=False)
-        print(f"Video Başlığı: {info.get('title')}\n")
-        
-        # .m3u8 / HLS linklerini listele
-        hls_found = False
-        for f in info.get('formats', []):
-            if f.get('protocol') in ['m3u8_native', 'm3u8_dash']:
-                hls_found = True
-                print(f"Format ID: {f['format_id']}")
-                print(f"Resolution: {f.get('height')}x{f.get('width')}")
-                print(f"URL: {f['url']}")
-                print("-" * 50)
-        
-        if not hls_found:
-            print("Herhangi bir .m3u8 (HLS) linki bulunamadı.")
+# Sayfayı çekme
+response = requests.get(url, headers=headers)
+html_content = response.text
 
-    except Exception as e:
-        print("Hata oluştu:", e)
+# BeautifulSoup ile parse etme
+soup = BeautifulSoup(html_content, "html.parser")
+
+# Tüm <link> etiketlerini bulma
+links = soup.find_all("link", rel="alternate")
+
+# Her linkin href ve hreflang değerlerini yazdırma
+for link in links:
+    href = link.get("href")
+    hreflang = link.get("hreflang")
+    print(f"hreflang: {hreflang}, href: {href}")
