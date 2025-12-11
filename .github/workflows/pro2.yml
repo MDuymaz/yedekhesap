@@ -2,8 +2,6 @@ name: 5-Hour Proxy Scanner
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "* */4 * * *"
 
 jobs:
   run-loop:
@@ -12,6 +10,8 @@ jobs:
     steps:
       - name: Repo'yu çek
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # rebase için şart!
 
       - name: Python kur
         uses: actions/setup-python@v5
@@ -65,21 +65,24 @@ jobs:
           RUNTIME_LIMIT = 5 * 60 * 60  # 5 hours
 
           while time.time() - start < RUNTIME_LIMIT:
-              print("[*] Yeni proxy taraması başlıyor...")
+              print("[*] Yeni proxy taraması başlıyor...", flush=True)
               count = run_scan()
-              print(f"[*] {count} adet çalışan proxy bulundu.")
+              print(f"[*] {count} adet çalışan proxy bulundu.", flush=True)
 
-              print("[*] Commit atılıyor...")
+              print("[*] Rebase yapılıyor...", flush=True)
+              subprocess.run(["git", "pull", "--rebase"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+              print("[*] Commit + Push yapılıyor...", flush=True)
               subprocess.run(["git", "config", "user.name", "GitHub Actions"])
               subprocess.run(["git", "config", "user.email", "actions@github.com"])
               subprocess.run(["git", "add", "pro.txt"])
-              subprocess.run(["git", "commit", "-m", "Auto-update pro.txt"], stderr=subprocess.DEVNULL)
-              subprocess.run(["git", "push"])
+              subprocess.run(["git", "commit", "-m", "Auto-update pro.txt"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+              subprocess.run(["git", "push"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
               print("[*] 5 dakika bekleniyor...", flush=True)
-              time.sleep(300)  # 5 minutes
+              time.sleep(300)
 
-          print("[*] 5 saatlik döngü tamamlandı.")
+          print("[*] 5 saatlik döngü tamamlandı.", flush=True)
           EOF
 
       - name: Gerekli paketleri kur
