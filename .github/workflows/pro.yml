@@ -1,0 +1,108 @@
+name: Proxy Scanner
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"  # Her 15 dakikada bir çalışır
+  workflow_dispatch:
+
+jobs:
+  scan-proxies:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Repo'yu çek
+        uses: actions/checkout@v4
+
+      - name: Python kur
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Proxy tarayıcı kodunu oluştur
+        run: |
+          cat << 'EOF' > pro.py
+          import requests
+          import concurrent.futures
+          import threading
+
+          PROXY_LIST_URL = "https://raw.githubusercontent.com/ProxyScraper/ProxyScraper/refs/heads/main/http.txt"
+          TARGET_TEST_URL = "https://cloudflare.com/cdn-cgi/trace"
+
+          working_proxies = []
+          lock = threading.Lock()
+          stop_testing = False
+          MAX_PROXY = 20
+
+          def get_proxies():
+              print("[*] Proxy listesi indiriliyor...")
+              txt = requests.get(PROXY_LIST_URL, timeout=10).text
+              proxies = [line.strip() for line in txt.split("\n") if ":" in line]
+              print(f"[*] Toplam proxy: {len(proxies)}")
+              return proxies
+
+          def test_proxy(proxy):
+              global stop_testing
+
+              if stop_testing:
+                  return
+
+              proxies = {
+                  "http": f"http://{proxy}",
+                  "https": f"http://{proxy}"
+              }
+
+              try:
+                  r = requests.get(
+                      TARGET_TEST_URL,
+                      proxies=proxies,
+                      timeout=2
+                  )
+
+                  if r.status_code == 200:
+                      with lock:
+                          if len(working_proxies) < MAX_PROXY:
+                              working_proxies.append(proxy)
+                              print(f"[✓] Çalışan proxy: {proxy}")
+
+                              if len(working_proxies) >= MAX_PROXY:
+                                  stop_testing = True
+              except:
+                  pass
+
+          def main():
+              proxies = get_proxies()
+
+              print("[*] Ultra hızlı proxy testi başlıyor...")
+
+              with concurrent.futures.ThreadPoolExecutor(max_workers=600) as executor:
+                  executor.map(test_proxy, proxies)
+
+              with open("pro.txt", "w") as f:
+                  for p in working_proxies:
+                      f.write(p + "\n")
+
+              print("\n[*] pro.txt kaydedildi.")
+
+          if __name__ == "__main__":
+              main()
+          EOF
+
+      - name: Gerekli paketleri kur
+        run: pip install requests
+
+      - name: Proxy tarayıcıyı çalıştır
+        run: python pro.py
+
+      - name: pro.txt dosyasını commit et ve pushla
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add pro.txt
+          git commit -m "Auto-update pro.txt (proxy scan)" || echo "No changes to commit"
+          git push
+
+      - name: Artifact olarak da ekle
+        uses: actions/upload-artifact@v4
+        with:
+          name: working-proxies
+          path: pro.txt
