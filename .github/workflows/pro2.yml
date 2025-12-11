@@ -3,7 +3,7 @@ name: 5-Hour Proxy Scanner
 on:
   workflow_dispatch:
   schedule:
-    - cron: "* */4 * * *"
+    - cron: "* */4 * * *"  # Her 4 saatte bir otomatik tetikleme
 
 jobs:
   run-loop:
@@ -49,7 +49,6 @@ jobs:
           def run_scan():
               working = []
               lock = threading.Lock()
-
               proxies = get_proxies()
               with concurrent.futures.ThreadPoolExecutor(max_workers=600) as ex:
                   ex.map(lambda pr: test_proxy(pr, working, lock), proxies)
@@ -69,12 +68,28 @@ jobs:
               count = run_scan()
               print(f"[*] {count} adet çalışan proxy bulundu.")
 
-              print("[*] Commit atılıyor...")
+              # --- COMMIT & PUSH ---
+              print("[*] Commit atılıyor...", flush=True)
               subprocess.run(["git", "config", "user.name", "GitHub Actions"])
               subprocess.run(["git", "config", "user.email", "actions@github.com"])
-              subprocess.run(["git", "add", "pro.txt"])
-              subprocess.run(["git", "commit", "-m", "Auto-update pro.txt"], stderr=subprocess.DEVNULL)
-              subprocess.run(["git", "push"])
+
+              # Önce güncel durumu çek (çatışmaları engelle)
+              subprocess.run(["git", "pull", "--rebase", "--autostash"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+              # Commit varsa et, yoksa hata verme
+              subprocess.run(["git", "add", "pro.txt"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+              subprocess.run(["git", "commit", "-m", "Auto-update pro.txt"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+              # Push retry mekanizması
+              for attempt in range(5):
+                  print(f"[*] Push denemesi {attempt+1}/5...", flush=True)
+                  result = subprocess.run(["git", "push"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                  if result.returncode == 0:
+                      print("[✓] Push başarılı!", flush=True)
+                      break
+                  else:
+                      print("[!] Push başarısız, 3 saniye sonra tekrar...", flush=True)
+                      time.sleep(3)
 
               print("[*] 5 dakika bekleniyor...", flush=True)
               time.sleep(300)  # 5 minutes
