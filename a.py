@@ -3,6 +3,7 @@ from playwright.async_api import async_playwright
 import re
 
 async def wait_until_ready(page):
+    # Sezonlukdizi sayaç ekranı için
     while True:
         html = await page.content()
         if re.search(r"wait|\bsaniye\b|\bseconds\b", html, re.I):
@@ -12,6 +13,32 @@ async def wait_until_ready(page):
         else:
             print("Bekleme ekranı bitti.")
             break
+
+
+async def get_clean_html(page):
+    """
+    OUO / OUO.PRESS anti-spam ekranını tespit edip
+    12 saniye bekleyip yeniden dener.
+    """
+    while True:
+        # HTML'i al
+        html = await page.content()
+
+        # Spam ekranı tespiti
+        if "Çok fazla istek yaptınız" in html or "Too many requests" in html:
+            print("⚠️ Anti-spam ekranı algılandı! 12 saniye bekleniyor...")
+            await asyncio.sleep(12)
+
+            print("🔄 Sayfa yenileniyor...")
+            await page.reload()
+            await page.wait_for_load_state("domcontentloaded")
+            continue  # tekrar baştan dene
+
+        # HTML doluysa döndür
+        if "<head>" in html and "</head>" in html:
+            return html
+
+        await asyncio.sleep(0.1)
 
 
 async def main():
@@ -42,6 +69,7 @@ async def main():
         page = await context.new_page()
         await page.goto("https://sezonlukdizi8.com/player/link.asp")
 
+        # İlk sayaç ekranı
         await wait_until_ready(page)
 
         xpath = "/html/body/div/div/a[1]"
@@ -52,26 +80,17 @@ async def main():
 
         new_page = await popup_info.value
 
-        print("Yeni sayfa açıldı, DOM yüklenmesi bekleniyor...")
+        print("Yeni sayfa açıldı, DOM yükleniyor...")
         await new_page.wait_for_load_state("domcontentloaded")
 
-        print("HTML içeriği kontrol ediliyor...")
+        print("HTML kontrol ve anti-spam bypass başlatıldı...")
 
-        # 🔥 HTML hazır olana kadar deneme (network idle yok)
-        html = ""
-        for _ in range(30):   # en fazla 3 saniye (30 x 0.1s)
-            html = await new_page.content()
+        # 🔥 Anti-spam ekranını da aşan HTML alma
+        html = await get_clean_html(new_page)
 
-            # Head tag doldu mu kontrol et
-            if "<head>" in html and "</head>" in html:
-                print("HTML yeterince yüklendi.")
-                break
-            
-            await asyncio.sleep(0.1)
-
-        print("\n----- HTML BAŞLANGIÇ -----\n")
-        print(html[:2000])    # İstersen tümünü yazdırabilirim
-        print("\n---------------------------\n")
+        print("\n----- SON HTML -----\n")
+        print(html)
+        print("\n--------------------\n")
 
         await browser.close()
 
