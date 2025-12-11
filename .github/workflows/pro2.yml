@@ -1,0 +1,87 @@
+name: 5-Hour Proxy Scanner
+
+on:
+  workflow_dispatch:
+
+jobs:
+  run-loop:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Repo'yu çek
+        uses: actions/checkout@v4
+
+      - name: Python kur
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Döngülü çalışan proxy tarayıcıyı oluştur
+        run: |
+          cat << 'EOF' > loop.py
+          import time
+          import requests
+          import concurrent.futures
+          import threading
+          import subprocess
+
+          PROXY_LIST_URL = "https://raw.githubusercontent.com/ProxyScraper/ProxyScraper/refs/heads/main/http.txt"
+          TARGET_TEST_URL = "https://cloudflare.com/cdn-cgi/trace"
+          MAX_PROXY = 20
+
+          def get_proxies():
+              txt = requests.get(PROXY_LIST_URL, timeout=10).text
+              return [line.strip() for line in txt.split("\n") if ":" in line]
+
+          def test_proxy(proxy, working_proxies, lock):
+              proxies = {"http": f"http://{proxy}", "https": f"http://{proxy}"}
+              try:
+                  r = requests.get(TARGET_TEST_URL, proxies=proxies, timeout=2)
+                  if r.status_code == 200:
+                      with lock:
+                          if len(working_proxies) < MAX_PROXY:
+                              working_proxies.append(proxy)
+              except:
+                  pass
+
+          def run_scan():
+              working = []
+              lock = threading.Lock()
+
+              proxies = get_proxies()
+              with concurrent.futures.ThreadPoolExecutor(max_workers=600) as ex:
+                  ex.map(lambda pr: test_proxy(pr, working, lock), proxies)
+
+              with open("pro.txt", "w") as f:
+                  for p in working:
+                      f.write(p + "\n")
+
+              return len(working)
+
+          # ---- MAIN LOOP (5 hours) ----
+          start = time.time()
+          RUNTIME_LIMIT = 5 * 60 * 60  # 5 hours
+
+          while time.time() - start < RUNTIME_LIMIT:
+              print("[*] Yeni proxy taraması başlıyor...")
+              count = run_scan()
+              print(f"[*] {count} adet çalışan proxy bulundu.")
+
+              print("[*] Commit atılıyor...")
+              subprocess.run(["git", "config", "user.name", "GitHub Actions"])
+              subprocess.run(["git", "config", "user.email", "actions@github.com"])
+              subprocess.run(["git", "add", "pro.txt"])
+              subprocess.run(["git", "commit", "-m", "Auto-update pro.txt"], stderr=subprocess.DEVNULL)
+              subprocess.run(["git", "push"])
+
+              print("[*] 15 dakika bekleniyor...")
+              time.sleep(900)  # 15 minutes
+
+          print("[*] 5 saatlik döngü tamamlandı.")
+          EOF
+
+      - name: Gerekli paketleri kur
+        run: pip install requests
+
+      - name: Döngüyü çalıştır
+        run: python loop.py
