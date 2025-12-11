@@ -2,6 +2,8 @@ name: 5-Hour Proxy Scanner
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "* */4 * * *"
 
 jobs:
   run-loop:
