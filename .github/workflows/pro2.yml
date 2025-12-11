@@ -12,8 +12,6 @@ jobs:
     steps:
       - name: Repo'yu çek
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0   # rebase için şart!
 
       - name: Python kur
         uses: actions/setup-python@v5
@@ -67,24 +65,21 @@ jobs:
           RUNTIME_LIMIT = 5 * 60 * 60  # 5 hours
 
           while time.time() - start < RUNTIME_LIMIT:
-              print("[*] Yeni proxy taraması başlıyor...", flush=True)
+              print("[*] Yeni proxy taraması başlıyor...")
               count = run_scan()
-              print(f"[*] {count} adet çalışan proxy bulundu.", flush=True)
+              print(f"[*] {count} adet çalışan proxy bulundu.")
 
-              print("[*] Rebase yapılıyor...", flush=True)
-              subprocess.run(["git", "pull", "--rebase"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-              print("[*] Commit + Push yapılıyor...", flush=True)
+              print("[*] Commit atılıyor...")
               subprocess.run(["git", "config", "user.name", "GitHub Actions"])
               subprocess.run(["git", "config", "user.email", "actions@github.com"])
               subprocess.run(["git", "add", "pro.txt"])
-              subprocess.run(["git", "commit", "-m", "Auto-update pro.txt"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-              subprocess.run(["git", "push"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+              subprocess.run(["git", "commit", "-m", "Auto-update pro.txt"], stderr=subprocess.DEVNULL)
+              subprocess.run(["git", "push"])
 
               print("[*] 5 dakika bekleniyor...", flush=True)
-              time.sleep(300)
+              time.sleep(300)  # 5 minutes
 
-          print("[*] 5 saatlik döngü tamamlandı.", flush=True)
+          print("[*] 5 saatlik döngü tamamlandı.")
           EOF
 
       - name: Gerekli paketleri kur
