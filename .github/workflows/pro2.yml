@@ -76,8 +76,8 @@ jobs:
               subprocess.run(["git", "commit", "-m", "Auto-update pro.txt"], stderr=subprocess.DEVNULL)
               subprocess.run(["git", "push"])
 
-              print("[*] 15 dakika bekleniyor...")
-              time.sleep(900)  # 15 minutes
+              print("[*] 5 dakika bekleniyor...", Flush=True)
+              time.sleep(300)  # 5 minutes
 
           print("[*] 5 saatlik döngü tamamlandı.")
           EOF
