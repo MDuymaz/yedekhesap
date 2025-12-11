@@ -1,8 +1,8 @@
 name: Proxy Scanner
 
 on:
-  schedule:
-    - cron: "*/15 * * * *"  # Her 15 dakikada bir çalışır
+#  schedule:
+#    - cron: "*/15 * * * *"  # Her 15 dakikada bir çalışır
   workflow_dispatch:
 
 jobs:
