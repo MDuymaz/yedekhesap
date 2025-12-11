@@ -1,100 +1,73 @@
-name: Run Selenium Inline
+name: Run Playwright Inline
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ "main" ]
 
 jobs:
-  selenium-inline:
+  run-playwright:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
+      - name: Checkout repo
+        uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.10'
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
 
-    - name: Install Chrome
-      run: |
-        sudo apt-get update
-        wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-        sudo apt install -y ./google-chrome-stable_current_amd64.deb
+      - name: Install Playwright & browser deps
+        run: |
+          pip install playwright
+          playwright install chromium
+          playwright install-deps
 
-    - name: Install ChromeDriver
-      run: |
-        CHROME_VERSION=$(google-chrome --version | sed 's/Google Chrome //')
-        CHROME_MAJOR=$(echo "$CHROME_VERSION" | cut -d '.' -f 1)
+      - name: Run Playwright Inline Script
+        run: |
+          python3 - << 'EOF'
+          from playwright.sync_api import sync_playwright
+          import time
 
-        DRIVER_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/latest-patch-versions-per-build.json" \
-          | grep -o "\"$CHROME_MAJOR[^\"]*\"" | head -n 1 | tr -d '"')
+          with sync_playwright() as p:
+              browser = p.chromium.launch(headless=True)
+              context = browser.new_context(
+                  user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+                  extra_http_headers={
+                      "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+                      "accept-language": "tr-TR,tr;q=0.9,en-GB;q=0.8,en;q=0.7,en-US;q=0.6",
+                      "upgrade-insecure-requests": "1"
+                  }
+              )
 
-        wget "https://storage.googleapis.com/chrome-for-testing-public/$DRIVER_VERSION/linux64/chromedriver-linux64.zip"
-        unzip chromedriver-linux64.zip
-        sudo mv chromedriver-linux64/chromedriver /usr/local/bin/
-        sudo chmod +x /usr/local/bin/chromedriver
+              page = context.new_page()
 
-    - name: Install Python Dependencies
-      run: |
-        pip install selenium webdriver-manager
+              url = "https://sezonlukdizi8.com/player/link.asp"
+              print("Sayfa açılıyor:", url)
+              page.goto(url, wait_until="domcontentloaded")
 
-    - name: Run Selenium Inline Script
-      run: |
-        python3 - << 'EOF'
-        from selenium import webdriver
-        from selenium.webdriver.chrome.options import Options
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        import time
+              print("\n--- Otomatik alınan cookie'ler ---")
+              for cookie in context.cookies():
+                  print(cookie)
 
-        # --- Chrome Options ---
-        options = Options()
-        options.add_argument("--headless=new")
-        options.add_argument("--disable-gpu")
-        options.add_argument("--no-sandbox")
+              # XPath ile buton bulma
+              xpath = "/html/body/div/div/a[1]"
+              print("\nButon bekleniyor...")
+              page.wait_for_selector(f"xpath={xpath}")
 
-        # --- Browser Headers ---
-        options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36')
-        options.add_argument("accept=text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7")
-        options.add_argument("accept-language=tr-TR,tr;q=0.9,en-GB;q=0.8,en;q=0.7,en-US;q=0.6")
-        options.add_argument("upgrade-insecure-requests=1")
+              print("Butona tıklanıyor...")
+              with context.expect_page() as new_page_info:
+                  page.locator(f"xpath={xpath}").click()
 
-        driver = webdriver.Chrome(options=options)
+              new_page = new_page_info.value
 
-        url = "https://sezonlukdizi8.com/player/link.asp"
-        driver.get(url)
+              # Yeni sekme yüklenene kadar bekle
+              new_page.wait_for_load_state("domcontentloaded")
 
-        print("\n--- Tarayıcıdan otomatik alınan cookie'ler ---")
-        for c in driver.get_cookies():
-            print(c)
+              print("\n--- Yeni sekme URL ---")
+              print(new_page.url)
 
-        xpath_button = "/html/body/div/div/a[1]"
+              print("\n--- Yeni sekme HTML ---\n")
+              print(new_page.content())
 
-        print("\nButon bekleniyor...")
-        button = WebDriverWait(driver, 15).until(
-            EC.element_to_be_clickable((By.XPATH, xpath_button))
-        )
-
-        print("Butona tıklanıyor...")
-        button.click()
-
-        time.sleep(2)
-
-        tabs = driver.window_handles
-        if len(tabs) < 2:
-            raise Exception("Yeni sekme açılmadı!")
-
-        driver.switch_to.window(tabs[1])
-
-        print("\n--- Yeni sekmenin URL'i ---")
-        print(driver.current_url)
-
-        print("\n--- Yeni Sekme HTML ---\n")
-        print(driver.page_source)
-
-        driver.quit()
-        EOF
+              browser.close()
+          EOF
