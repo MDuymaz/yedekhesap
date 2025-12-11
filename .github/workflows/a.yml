@@ -2,9 +2,6 @@ name: Run a.py
 
 on:
   workflow_dispatch:  # Manuel çalıştırma (GitHub Actions > Run workflow)
-  push:
-    branches:
-      - main          # main branch'e push olunca çalışır (istersen kaldırabilirim)
 
 jobs:
   run-a-py:
@@ -25,12 +22,9 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install playwright
-          playwright install --with-deps chromium
+          pip install requests
 
       # a.py dosyasını çalıştır
       - name: Run a.py
-        env:
-          PYTHONUNBUFFERED: "1"
         run: |
           python a.py
