@@ -1,73 +1,36 @@
-name: Run Playwright Inline
+name: Run a.py
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:  # Manuel çalıştırma (GitHub Actions > Run workflow)
+  push:
+    branches:
+      - main          # main branch'e push olunca çalışır (istersen kaldırabilirim)
 
 jobs:
-  run-playwright:
+  run-a-py:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      # Repo’yu çek
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v4
+      # Python kurulumu
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: "3.10"
 
-      - name: Install Playwright & browser deps
+      # Gerekli paketleri kur
+      - name: Install dependencies
         run: |
+          pip install --upgrade pip
           pip install playwright
-          playwright install chromium
-          playwright install-deps
+          playwright install --with-deps chromium
 
-      - name: Run Playwright Inline Script
+      # a.py dosyasını çalıştır
+      - name: Run a.py
+        env:
+          PYTHONUNBUFFERED: "1"
         run: |
-          python3 - << 'EOF'
-          from playwright.sync_api import sync_playwright
-          import time
-
-          with sync_playwright() as p:
-              browser = p.chromium.launch(headless=True)
-              context = browser.new_context(
-                  user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
-                  extra_http_headers={
-                      "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-                      "accept-language": "tr-TR,tr;q=0.9,en-GB;q=0.8,en;q=0.7,en-US;q=0.6",
-                      "upgrade-insecure-requests": "1"
-                  }
-              )
-
-              page = context.new_page()
-
-              url = "https://sezonlukdizi8.com/player/link.asp"
-              print("Sayfa açılıyor:", url)
-              page.goto(url, wait_until="domcontentloaded")
-
-              print("\n--- Otomatik alınan cookie'ler ---")
-              for cookie in context.cookies():
-                  print(cookie)
-
-              # XPath ile buton bulma
-              xpath = "/html/body/div/div/a[1]"
-              print("\nButon bekleniyor...")
-              page.wait_for_selector(f"xpath={xpath}")
-
-              print("Butona tıklanıyor...")
-              with context.expect_page() as new_page_info:
-                  page.locator(f"xpath={xpath}").click()
-
-              new_page = new_page_info.value
-
-              # Yeni sekme yüklenene kadar bekle
-              new_page.wait_for_load_state("domcontentloaded")
-
-              print("\n--- Yeni sekme URL ---")
-              print(new_page.url)
-
-              print("\n--- Yeni sekme HTML ---\n")
-              print(new_page.content())
-
-              browser.close()
-          EOF
+          python a.py
