@@ -21,7 +21,7 @@ jobs:
 
       - name: Proxy tarama döngüsü
         run: |
-          echo "=== 300 defalık proxy tarama döngüsü başlıyor ==="
+          echo "=== 60 defalık proxy tarama döngüsü başlıyor ==="
           
           # Proxy tarayıcı kodu
           cat << 'EOF' > pro.py
@@ -70,8 +70,8 @@ jobs:
               main()
           EOF
 
-          # 300 defalık döngü
-          for i in $(seq 1 300); do
+          # 60 defalık döngü
+          for i in $(seq 1 60); do
             echo "=== Döngü $i ==="
             python pro.py
 
@@ -81,11 +81,11 @@ jobs:
             git commit -m "Auto-update pro.txt - iteration $i" || echo "No changes"
             git push
 
-            echo "=== 1 dakika bekleniyor ==="
-            sleep 60
+            echo "=== 5 dakika bekleniyor ==="
+            sleep 300
           done
 
-          echo "=== 300 döngü tamamlandı, workflow kendini tetikleyecek ==="
+          echo "=== 60 döngü tamamlandı, workflow kendini tetikleyecek ==="
 
           # Kendini tetikle (master branch)
           curl -X POST \
