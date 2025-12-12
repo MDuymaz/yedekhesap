@@ -22,7 +22,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install requests
+          pip install requests aiohttp beautifulsoup4
 
       # a.py dosyasını çalıştır
       - name: Run a.py
