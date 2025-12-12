@@ -1,4 +1,4 @@
-name: Proxy Scanner Loop
+name: Proxy Scanner
 
 on:
   workflow_dispatch:
@@ -6,7 +6,6 @@ on:
 jobs:
   scan-proxies:
     runs-on: ubuntu-latest
-    timeout-minutes: 360   # 6 saat limit → 5 saat döngü için yeterli
 
     steps:
       - name: Repo'yu çek
@@ -17,29 +16,37 @@ jobs:
         with:
           python-version: "3.10"
 
-      - name: Döngülü proxy tarayıcı kodunu oluştur
+      - name: Gerekli paketleri kur
+        run: pip install requests
+
+      - name: Tek döngü proxy tarama (test için)
         run: |
-          cat << 'EOF' > pro_loop.py
+          echo "=== Tek döngü başlıyor ==="
+          
+          # Proxy tarayıcı kodu
+          cat << 'EOF' > pro.py
           import requests
           import concurrent.futures
           import threading
-          import time
-          import subprocess
 
           PROXY_LIST_URL = "https://raw.githubusercontent.com/ProxyScraper/ProxyScraper/refs/heads/main/http.txt"
           TARGET_TEST_URL = "https://cloudflare.com/cdn-cgi/trace"
+
+          working_proxies = []
+          lock = threading.Lock()
+          stop_testing = False
           MAX_PROXY = 20
 
           def get_proxies():
               txt = requests.get(PROXY_LIST_URL, timeout=10).text
-              return [line.strip() for line in txt.split("\n") if ":" in line]
+              proxies = [line.strip() for line in txt.split("\n") if ":" in line]
+              return proxies
 
-          def test_proxy(proxy, working_proxies, lock, stop_flag):
-              if stop_flag["stop"]:
+          def test_proxy(proxy):
+              global stop_testing
+              if stop_testing:
                   return
-
               proxies = {"http": f"http://{proxy}", "https": f"http://{proxy}"}
-
               try:
                   r = requests.get(TARGET_TEST_URL, proxies=proxies, timeout=2)
                   if r.status_code == 200:
@@ -47,53 +54,39 @@ jobs:
                           if len(working_proxies) < MAX_PROXY:
                               working_proxies.append(proxy)
                               if len(working_proxies) >= MAX_PROXY:
-                                  stop_flag["stop"] = True
+                                  stop_testing = True
               except:
                   pass
 
-          def scan_once():
-              lock = threading.Lock()
-              stop_flag = {"stop": False}
-              working = []
-
-              proxies = get_proxies()
-
-              with concurrent.futures.ThreadPoolExecutor(max_workers=500) as executor:
-                  executor.map(lambda p: test_proxy(p, working, lock, stop_flag), proxies)
-
-              with open("pro.txt", "w") as f:
-                  for p in working:
-                      f.write(p + "\n")
-
-          def git_force_push():
-              subprocess.run(["git", "config", "user.name", "GitHub Actions"])
-              subprocess.run(["git", "config", "user.email", "actions@github.com"])
-
-              subprocess.run(["git", "fetch", "--all"])
-              subprocess.run(["git", "reset", "--hard", "origin/master"])
-
-              subprocess.run(["git", "add", "pro.txt"])
-              subprocess.run(["git", "commit", "-m", "Auto-update: 20 proxies"], stderr=subprocess.DEVNULL)
-
-              subprocess.run(["git", "push", "origin", "HEAD:master", "--force"])
-
           def main():
-              start = time.time()
-              FIVE_HOURS = 5 * 60 * 60
-
-              while time.time() - start < FIVE_HOURS:
-                  print("[*] Yeni tarama başlıyor...")
-                  scan_once()
-                  git_force_push()
-                  print("[*] 20 proxy kaydedildi → 5 dakika bekleniyor...")
-                  time.sleep(300)  # 5 dakika
+              proxies = get_proxies()
+              with concurrent.futures.ThreadPoolExecutor(max_workers=600) as executor:
+                  executor.map(test_proxy, proxies)
+              with open("pro.txt", "w") as f:
+                  for p in working_proxies:
+                      f.write(p + "\n")
 
           if __name__ == "__main__":
               main()
           EOF
 
-      - name: Gerekli paketleri kur
-        run: pip install requests
+          # Çalıştır
+          python pro.py
 
-      - name: Döngülü taramayı başlat
-        run: python pro_loop.py
+          # Commit ve push
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add pro.txt
+          git commit -m "Auto-update pro.txt - test loop" || echo "No changes"
+          git push
+
+          echo "=== Workflow sonunda kendini tetikleyecek ==="
+
+          # Kendini tetikle
+          curl -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            https://api.github.com/repos/${{ github.repository }}/actions/workflows/${{ github.workflow }}/dispatches \
+            -d '{"ref":"main"}'
+
+          echo "Workflow tetiklendi, mevcut workflow sonlanıyor."
