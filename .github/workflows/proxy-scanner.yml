@@ -19,68 +19,77 @@ jobs:
       - name: Gerekli paketleri kur
         run: pip install requests
 
-      - name: Tek döngü proxy tarama (test için)
+      - name: 200 döngü proxy tarama
         run: |
-          echo "=== Tek döngü başlıyor ==="
-          
-          # Proxy tarayıcı kodu
-          cat << 'EOF' > pro.py
-          import requests
-          import concurrent.futures
-          import threading
+          echo "=== 200 döngü başlıyor ==="
 
-          PROXY_LIST_URL = "https://raw.githubusercontent.com/ProxyScraper/ProxyScraper/refs/heads/main/http.txt"
-          TARGET_TEST_URL = "https://cloudflare.com/cdn-cgi/trace"
+          for i in {1..200}; do
+            echo "=== Döngü $i / 200 ==="
+            
+            # Proxy tarayıcı kodu
+            cat << 'EOF' > pro.py
+            import requests
+            import concurrent.futures
+            import threading
 
-          working_proxies = []
-          lock = threading.Lock()
-          stop_testing = False
-          MAX_PROXY = 20
+            PROXY_LIST_URL = "https://raw.githubusercontent.com/ProxyScraper/ProxyScraper/refs/heads/main/http.txt"
+            TARGET_TEST_URL = "https://cloudflare.com/cdn-cgi/trace"
 
-          def get_proxies():
-              txt = requests.get(PROXY_LIST_URL, timeout=10).text
-              proxies = [line.strip() for line in txt.split("\n") if ":" in line]
-              return proxies
+            working_proxies = []
+            lock = threading.Lock()
+            stop_testing = False
+            MAX_PROXY = 20
 
-          def test_proxy(proxy):
-              global stop_testing
-              if stop_testing:
-                  return
-              proxies = {"http": f"http://{proxy}", "https": f"http://{proxy}"}
-              try:
-                  r = requests.get(TARGET_TEST_URL, proxies=proxies, timeout=2)
-                  if r.status_code == 200:
-                      with lock:
-                          if len(working_proxies) < MAX_PROXY:
-                              working_proxies.append(proxy)
-                              if len(working_proxies) >= MAX_PROXY:
-                                  stop_testing = True
-              except:
-                  pass
+            def get_proxies():
+                txt = requests.get(PROXY_LIST_URL, timeout=10).text
+                proxies = [line.strip() for line in txt.split("\n") if ":" in line]
+                return proxies
 
-          def main():
-              proxies = get_proxies()
-              with concurrent.futures.ThreadPoolExecutor(max_workers=600) as executor:
-                  executor.map(test_proxy, proxies)
-              with open("pro.txt", "w") as f:
-                  for p in working_proxies:
-                      f.write(p + "\n")
+            def test_proxy(proxy):
+                global stop_testing
+                if stop_testing:
+                    return
+                proxies = {"http": f"http://{proxy}", "https": f"http://{proxy}"}
+                try:
+                    r = requests.get(TARGET_TEST_URL, proxies=proxies, timeout=2)
+                    if r.status_code == 200:
+                        with lock:
+                            if len(working_proxies) < MAX_PROXY:
+                                working_proxies.append(proxy)
+                                if len(working_proxies) >= MAX_PROXY:
+                                    stop_testing = True
+                except:
+                    pass
 
-          if __name__ == "__main__":
-              main()
-          EOF
+            def main():
+                proxies = get_proxies()
+                with concurrent.futures.ThreadPoolExecutor(max_workers=600) as executor:
+                    executor.map(test_proxy, proxies)
+                with open("pro.txt", "w") as f:
+                    for p in working_proxies:
+                        f.write(p + "\n")
 
-          # Çalıştır
-          python pro.py
+            if __name__ == "__main__":
+                main()
+            EOF
 
-          # Commit ve push
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          git add pro.txt
-          git commit -m "Auto-update pro.txt - test loop" || echo "No changes"
-          git push
+            # Çalıştır
+            python pro.py
 
-          echo "=== Workflow sonunda kendini tetikleyecek ==="
+            # Commit ve push
+            git config user.name "GitHub Actions"
+            git config user.email "actions@github.com"
+            git add pro.txt
+            git commit -m "Auto-update pro.txt - loop $i" || echo "No changes"
+            git push
+
+            echo "=== Döngü $i tamamlandı ==="
+            echo "60 saniye bekleniyor"
+            sleep 60
+
+          done
+
+          echo "=== 200 döngü tamamlandı, workflow kendini tetikliyor ==="
 
           # Kendini tetikle (master branch)
           curl -X POST \
