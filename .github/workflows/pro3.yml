@@ -6,7 +6,7 @@ on:
 jobs:
   scan-proxies:
     runs-on: ubuntu-latest
-    timeout-minutes: 360   # 6 saat sınır: 5 saatlik döngü için güvenli
+    timeout-minutes: 360   # 6 saat limit → 5 saat döngü için yeterli
 
     steps:
       - name: Repo'yu çek
@@ -17,7 +17,7 @@ jobs:
         with:
           python-version: "3.10"
 
-      - name: Proxy tarayıcı kodunu oluştur
+      - name: Döngülü proxy tarayıcı kodunu oluştur
         run: |
           cat << 'EOF' > pro_loop.py
           import requests
@@ -65,31 +65,35 @@ jobs:
                   for p in working:
                       f.write(p + "\n")
 
-          def git_push():
+          def git_force_push():
               subprocess.run(["git", "config", "user.name", "GitHub Actions"])
               subprocess.run(["git", "config", "user.email", "actions@github.com"])
+
+              subprocess.run(["git", "fetch", "--all"])
+              subprocess.run(["git", "reset", "--hard", "origin/master"])
+
               subprocess.run(["git", "add", "pro.txt"])
-              subprocess.run(["git", "commit", "-m", "Auto-update 20 proxies"], stderr=subprocess.DEVNULL)
-              subprocess.run(["git", "pull", "--rebase", "--autostash"])
-              subprocess.run(["git", "push"])
+              subprocess.run(["git", "commit", "-m", "Auto-update: 20 proxies"], stderr=subprocess.DEVNULL)
+
+              subprocess.run(["git", "push", "origin", "HEAD:master", "--force"])
 
           def main():
               start = time.time()
               FIVE_HOURS = 5 * 60 * 60
 
               while time.time() - start < FIVE_HOURS:
-                  print("[*] Yeni tarama başlatılıyor...")
+                  print("[*] Yeni tarama başlıyor...")
                   scan_once()
-                  git_push()
-                  print("[*] 20 proxy kaydedildi, 5 dakika bekleniyor...")
-                  time.sleep(300)  # 5 dakika bekle
+                  git_force_push()
+                  print("[*] 20 proxy kaydedildi → 5 dakika bekleniyor...")
+                  time.sleep(300)  # 5 dakika
 
           if __name__ == "__main__":
               main()
           EOF
 
-      - name: Gerekli paketler
+      - name: Gerekli paketleri kur
         run: pip install requests
 
-      - name: Döngülü tarayıcıyı çalıştır
+      - name: Döngülü taramayı başlat
         run: python pro_loop.py
