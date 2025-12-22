@@ -17,81 +17,26 @@ jobs:
           python-version: "3.10"
 
       - name: Gerekli paketleri kur
-        run: pip install requests
-
-      - name: Proxy tarama döngüsü
         run: |
-          echo "=== 15 defalık proxy tarama döngüsü başlıyor ==="
-          
-          # Proxy tarayıcı kodu
-          cat << 'EOF' > pro.py
-          import requests
-          import concurrent.futures
-          import threading
-          
-          PROXY_LIST_URL = "https://raw.githubusercontent.com/ProxyScraper/ProxyScraper/refs/heads/main/http.txt"
-          TARGET_TEST_URL = "https://cloudflare.com/cdn-cgi/trace"
-          
-          working_proxies = []
-          us_count = 0
-          lock = threading.Lock()
-          stop_testing = False
-          MAX_PROXY = 20
-          MAX_US = 5  # Maksimum US proxy sayısı
-          
-          def get_proxies():
-              txt = requests.get(PROXY_LIST_URL, timeout=10).text
-              proxies = [line.strip() for line in txt.split("\n") if ":" in line]
-              return proxies
-          
-          def test_proxy(proxy):
-              global stop_testing, us_count
-              if stop_testing:
-                  return
-              proxies = {"http": f"http://{proxy}", "https": f"http://{proxy}"}
-              try:
-                  r = requests.get(TARGET_TEST_URL, proxies=proxies, timeout=3)
-                  if r.status_code == 200:
-                      # Cloudflare trace çıktısını parse et
-                      loc = "Unknown"
-                      for line in r.text.split("\n"):
-                          if line.startswith("loc="):
-                              loc = line.split("=")[1].strip()
-                              break
-                      with lock:
-                          # US sayısı kontrolü
-                          if loc == "US" and us_count >= MAX_US:
-                              return  # 5 US geçtiyse ekleme
-                          if loc == "US":
-                              us_count += 1
-          
-                          if len(working_proxies) < MAX_PROXY:
-                              working_proxies.append(proxy)
-                              print(f"Working proxy found: {proxy} ({loc})")
-                              if len(working_proxies) >= MAX_PROXY:
-                                  stop_testing = True
-              except:
-                  pass
-          
-          def main():
-              proxies = get_proxies()
-              with concurrent.futures.ThreadPoolExecutor(max_workers=600) as executor:
-                  executor.map(test_proxy, proxies)
-              with open("pro.txt", "w") as f:
-                  for p in working_proxies:
-                      f.write(p + "\n")  # Sadece proxy
-          
-          if __name__ == "__main__":
-              main()
-          EOF
+          pip install requests
 
-          # 15 defalık döngü
+      - name: Proxy tarama döngüsü (kod SECRET içinden)
+        env:
+          SECRETS_CODE: ${{ secrets.SECRETS_CODE }}
+        run: |
+          echo "=== Python kodu secret içinden yazılıyor ==="
+          echo "$SECRETS_CODE" > pro.py
+
+          echo "=== 15 defalık proxy tarama döngüsü başlıyor ==="
+
           for i in $(seq 1 15); do
             echo "=== Döngü $i ==="
+
             python pro.py
 
             git config user.name "GitHub Actions"
             git config user.email "actions@github.com"
+
             git add pro.txt
             git commit -m "Auto-update pro.txt - iteration $i" || echo "No changes"
             git push
@@ -100,13 +45,10 @@ jobs:
             sleep 600
           done
 
-          echo "=== 15 döngü tamamlandı, workflow kendini tetikleyecek ==="
+          echo "=== Döngü tamamlandı, workflow yeniden tetikleniyor ==="
 
-          # Kendini tetikle (master branch)
           curl -X POST \
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             https://api.github.com/repos/${{ github.repository }}/actions/workflows/proxy-scanner.yml/dispatches \
             -d '{"ref":"master"}'
-
-          echo "Workflow tetiklendi, mevcut workflow sonlanıyor."
