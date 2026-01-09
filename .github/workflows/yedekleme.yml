@@ -1,0 +1,48 @@
+name: GitHub Repo Yedekleme
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */12 * * *"
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Repo A checkout
+        uses: actions/checkout@v4
+
+      - name: Python kurulumu
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Python bağımlılıkları
+        run: |
+          pip install requests
+
+      - name: Python backup script çalıştır
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          python backup.py
+          ls -lah *.zip
+
+      - name: Yedek repo clone
+        run: |
+          git clone https://${{ secrets.YEDEKLEME_TOKENI }}@github.com/HEDEF_KULLANICI/HEDEF_REPO.git backup-repo
+
+      - name: Zip dosyalarını yedek repo'ya kopyala
+        run: |
+          cp *.zip backup-repo/
+
+      - name: Commit ve push (yedek repo)
+        run: |
+          cd backup-repo
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+
+          git add .
+          git commit -m "🔄 Otomatik yedekleme - $(date '+%Y-%m-%d %H:%M')" || echo "Değişiklik yok"
+          git push
