@@ -31,7 +31,7 @@ jobs:
 
       - name: Yedek repo clone
         run: |
-          git clone https://${{ secrets.YEDEKLEME_TOKENI }}@github.com/HEDEF_KULLANICI/HEDEF_REPO.git backup-repo
+          git clone https://${{ secrets.YEDEKLEME_TOKENI }}@github.com/MDuymaz/yedeklemesistemi.git backup-repo
 
       - name: Zip dosyalarını yedek repo'ya kopyala
         run: |
