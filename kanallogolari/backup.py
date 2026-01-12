@@ -11,7 +11,8 @@ REPOS = [
     "domain",
     "iptv-proxy-full",
     "iptv-proxy-worker",
-    "m3u8file"
+    "m3u8file",
+    "xtreamcode2"
 
 ]
 
