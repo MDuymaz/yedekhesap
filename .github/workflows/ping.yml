@@ -16,9 +16,9 @@ jobs:
           PING_URL3: ${{ secrets.PING_URL3   }}          
           PING_XTREAM1: ${{ secrets.PING_XTREAM1 }}
           PING_XTREAM2: ${{ secrets.PING_XTREAM2 }}
-          PING_CACHE_URL1: ${{ secrets.PING_CACHE_URL2 }}
-          PING_CACHE_URL2: ${{ secrets.PING_CACHE_URL3 }}
-          PING_CACHE_URL3: ${{ secrets.PING_CACHE_URL4 }}
+          PING_CACHE_URL1: ${{ secrets.PING_CACHE_URL1 }}
+          PING_CACHE_URL2: ${{ secrets.PING_CACHE_URL2 }}
+          PING_CACHE_URL3: ${{ secrets.PING_CACHE_URL3 }}
         run: |
           # jq yoksa yükle
           if ! command -v jq &> /dev/null; then
