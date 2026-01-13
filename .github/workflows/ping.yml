@@ -11,14 +11,14 @@ jobs:
       - name: 5 saat boyunca her 10 dakikada bir ping at (19:00–23:00 arası cache atlama)
         env:
           
+          PING_URL1: ${{ secrets.PING_URL1 }}
           PING_URL2: ${{ secrets.PING_URL2 }}
-          PING_URL3: ${{ secrets.PING_URL3 }}
-          PING_URL4: ${{ secrets.PING_URL4 }}          
-          PING_XTREAM: ${{ secrets.PING_XTREAM }}
+          PING_URL3: ${{ secrets.PING_URL3   }}          
+          PING_XTREAM1: ${{ secrets.PING_XTREAM1 }}
           PING_XTREAM2: ${{ secrets.PING_XTREAM2 }}
-          PING_CACHE_URL2: ${{ secrets.PING_CACHE_URL2 }}
-          PING_CACHE_URL3: ${{ secrets.PING_CACHE_URL3 }}
-          PING_CACHE_URL4: ${{ secrets.PING_CACHE_URL4 }}
+          PING_CACHE_URL1: ${{ secrets.PING_CACHE_URL2 }}
+          PING_CACHE_URL2: ${{ secrets.PING_CACHE_URL3 }}
+          PING_CACHE_URL3: ${{ secrets.PING_CACHE_URL4 }}
         run: |
           # jq yoksa yükle
           if ! command -v jq &> /dev/null; then
@@ -30,7 +30,7 @@ jobs:
 
           while [ $SECONDS -lt $END_TIME ]; do
             # Normal URL ping
-            for URL_NAME in PING_URL2 PING_URL3 PING_URL4 PING_XTREAM PING_XTREAM2; do
+            for URL_NAME in PING_URL1 PING_URL2 PING_URL3 PING_XTREAM1 PING_XTREAM2; do
               URL=${!URL_NAME}
               echo "🔄 $URL_NAME için ping atılıyor: $URL - $(date '+%Y-%m-%d %H:%M:%S' -u)"
               
@@ -58,7 +58,7 @@ jobs:
           else
             echo "🕘 Cache ping zamanı — Türkiye saatiyle $CURRENT_HOUR:00"
 
-            for CACHE_NAME in PING_CACHE_URL2 PING_CACHE_URL3 PING_CACHE_URL4; do
+            for CACHE_NAME in PING_CACHE_URL1 PING_CACHE_URL2 PING_CACHE_URL3; do
               CACHE_URL=${!CACHE_NAME}
               echo "🔄 $CACHE_NAME cache ping atılıyor: $CACHE_URL - $(date '+%Y-%m-%d %H:%M:%S' -u)"
               
