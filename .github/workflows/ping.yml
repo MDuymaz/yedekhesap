@@ -1,4 +1,4 @@
-name: Keep Proxy Alive 2 URL 19-23 ARASI PİNG YOK
+name: Ping
 on:
   schedule:
     - cron: "* */4 * * *"
