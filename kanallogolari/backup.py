@@ -7,13 +7,11 @@ OWNER = "opitiopiti"
 REPOS = [
     "Py",
     "ordanburdansurdan",
-    "xtreamsistemi",
-    "domain",
-    "iptv-proxy-full",
-    "iptv-proxy-worker",
     "m3u8file",
-    "xtreamcode2"
-
+    "xtreamcode2",
+    "xtreamsistemi",
+    "iptv-proxy-worker",
+    "domain"
 ]
 
 BRANCH = "main"
