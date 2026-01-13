@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Repo A checkout
+      - name: Ana repo checkout
         uses: actions/checkout@v4
 
       - name: Python kurulumu
@@ -20,14 +20,16 @@ jobs:
 
       - name: Python bağımlılıkları
         run: |
+          pip install --upgrade pip
           pip install requests
 
       - name: Python backup script çalıştır
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          YEDEKLEME_TOKENI: ${{ secrets.YEDEKLEME_TOKENI }}
         run: |
           python kanallogolari/backup.py
-          ls -lah *.zip
+          ls -lah || true
 
       - name: Yedek repo clone
         run: |
@@ -35,7 +37,8 @@ jobs:
 
       - name: Zip dosyalarını yedek repo'ya kopyala
         run: |
-          cp *.zip backup-repo/
+          shopt -s nullglob
+          cp *.zip backup-repo/ || echo "Kopyalanacak zip yok"
 
       - name: Commit ve push (yedek repo)
         run: |
@@ -48,12 +51,12 @@ jobs:
           git push
 
       - name: Telegram Success Notification
+        if: success()
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        if: success()
         run: |
-          MESSAGE="✅ Yedekleme Sistemi başarıyla güncellendi!"
+          MESSAGE="✅ GitHub Repo Yedekleme başarıyla tamamlandı!"
           curl -s -o /dev/null -X POST "https://api.telegram.org/bot$TELEGRAM_TOKEN/sendMessage" \
             -d chat_id="$TELEGRAM_CHAT_ID" \
             -d text="$MESSAGE"
