@@ -27,9 +27,9 @@ jobs:
           echo "=== Python kodu secret içinden yazılıyor ==="
           echo "$SECRETS_CODE" > pro.py
 
-          echo "=== 30 defalık proxy tarama döngüsü başlıyor ==="
+          echo "=== 15 defalık proxy tarama döngüsü başlıyor ==="
 
-          for i in $(seq 1 30); do
+          for i in $(seq 1 15); do
             echo "=== Döngü $i ==="
 
             python pro.py
