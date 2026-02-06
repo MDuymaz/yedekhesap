@@ -20,6 +20,18 @@ jobs:
         run: |
           pip install requests
 
+      - name: Telegram Success Notification
+        if: success()
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          MESSAGE="✅ Proxy Arama Sistemi tekrardan başarıyla başlatıldı!"
+          curl -s -o /dev/null -X POST "https://api.telegram.org/bot$TELEGRAM_TOKEN/sendMessage" \
+            -d chat_id="$TELEGRAM_CHAT_ID" \
+            -d text="$MESSAGE"
+
+
       - name: Proxy tarama döngüsü (kod SECRET içinden)
         env:
           SECRETS_CODE: ${{ secrets.SECRETS_CODE }}
@@ -58,14 +70,3 @@ jobs:
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             https://api.github.com/repos/${{ github.repository }}/actions/workflows/ping.yml/dispatches \
             -d '{"ref":"master"}'
-
-      - name: Telegram Success Notification
-        if: success()
-        env:
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          MESSAGE="✅ Proxy Arama Sistemi tekrardan başarıyla başlatıldı!"
-          curl -s -o /dev/null -X POST "https://api.telegram.org/bot$TELEGRAM_TOKEN/sendMessage" \
-            -d chat_id="$TELEGRAM_CHAT_ID" \
-            -d text="$MESSAGE"
