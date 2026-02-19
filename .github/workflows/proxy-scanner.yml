@@ -39,9 +39,9 @@ jobs:
           echo "=== Python kodu secret içinden yazılıyor ==="
           echo "$SECRETS_CODE" > pro.py
 
-          echo "=== 15 defalık proxy tarama döngüsü başlıyor ==="
+          echo "=== 5 defalık proxy tarama döngüsü başlıyor ==="
 
-          for i in $(seq 1 15); do
+          for i in $(seq 1 5); do
             echo "=== Döngü $i ==="
 
             python pro.py
@@ -53,8 +53,8 @@ jobs:
             git commit -m "Auto-update pro.txt - iteration $i" || echo "No changes"
             git push
 
-            echo "=== 10 dakika bekleniyor ==="
-            sleep 600
+            echo "=== 20 dakika bekleniyor ==="
+            sleep 1200
           done
 
           echo "=== Döngü tamamlandı, workflow yeniden tetikleniyor ==="
