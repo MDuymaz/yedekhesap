@@ -12,6 +12,7 @@ jobs:
         env:
           
           PINGURL_1: ${{ secrets.PINGURL_1 }}
+          PING_XTREAM1: ${{ secrets.PING_XTREAM1 }}
           PING_CLEAR_CACHE_PROXY: ${{ secrets.PING_CLEAR_CACHE_PROXY }}
           
         run: |
