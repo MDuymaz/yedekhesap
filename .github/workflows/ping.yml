@@ -26,7 +26,7 @@ jobs:
 
           while [ $SECONDS -lt $END_TIME ]; do
             # Normal URL ping
-            for URL_NAME in PINURL_1 PING_XTREAM1; do
+            for URL_NAME in PINGURL_1 PING_XTREAM1; do
               URL=${!URL_NAME}
               echo "🔄 $URL_NAME için ping atılıyor: $URL - $(date '+%Y-%m-%d %H:%M:%S' -u)"
               
