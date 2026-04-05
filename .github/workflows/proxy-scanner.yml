@@ -20,18 +20,6 @@ jobs:
         run: |
           pip install requests
 
-      - name: Telegram Success Notification
-        if: success()
-        env:
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          MESSAGE="✅ Proxy Arama Sistemi tekrardan başarıyla başlatıldı!"
-          curl -s -o /dev/null -X POST "https://api.telegram.org/bot$TELEGRAM_TOKEN/sendMessage" \
-            -d chat_id="$TELEGRAM_CHAT_ID" \
-            -d text="$MESSAGE"
-
-
       - name: Proxy tarama döngüsü (kod SECRET içinden)
         env:
           SECRETS_CODE: ${{ secrets.SECRETS_CODE }}
@@ -44,14 +32,23 @@ jobs:
           for i in $(seq 1 5); do
             echo "=== Döngü $i ==="
 
-            python pro.py
+            # Python hata verirse workflow FAIL olur
+            if ! python pro.py; then
+              echo "❌ Python script hata verdi!"
+              exit 1
+            fi
 
             git config user.name "GitHub Actions"
             git config user.email "actions@github.com"
 
             git add pro.txt
+
             git commit -m "Auto-update pro.txt - iteration $i" || echo "No changes"
-            git push
+
+            git push || {
+              echo "❌ Git push failed"
+              exit 1
+            }
 
             echo "=== 20 dakika bekleniyor ==="
             sleep 1200
@@ -70,3 +67,14 @@ jobs:
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             https://api.github.com/repos/${{ github.repository }}/actions/workflows/ping.yml/dispatches \
             -d '{"ref":"master"}'
+
+      - name: Telegram Failure Notification
+        if: failure()
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          MESSAGE="❌ Proxy Scanner HATA verdi! Workflow başarısız oldu."
+          curl -s -o /dev/null -X POST "https://api.telegram.org/bot$TELEGRAM_TOKEN/sendMessage" \
+            -d chat_id="$TELEGRAM_CHAT_ID" \
+            -d text="$MESSAGE"
