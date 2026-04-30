@@ -12,6 +12,7 @@ jobs:
         env:
           
           PINGURL_1: ${{ secrets.PINGURL_1 }}
+          PINGURL_2: ${{ secrets.PINGURL_2 }}
           PING_XTREAM1: ${{ secrets.PING_XTREAM1 }}
           PING_CLEAR_CACHE_PROXY: ${{ secrets.PING_CLEAR_CACHE_PROXY }}
           
@@ -26,7 +27,7 @@ jobs:
 
           while [ $SECONDS -lt $END_TIME ]; do
             # Normal URL ping
-            for URL_NAME in PINGURL_1 PING_XTREAM1; do
+            for URL_NAME in PINGURL_1 PINGURL_2 PING_XTREAM1; do
               URL=${!URL_NAME}
               echo "🔄 $URL_NAME için ping atılıyor: $URL - $(date '+%Y-%m-%d %H:%M:%S' -u)"
               
